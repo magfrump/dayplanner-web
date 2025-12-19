@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const app = express();
-const port = 3001;
+const port = 3002;
 // const dataFile = path.resolve(process.env.DATA_FILE || 'planner-data.json');
 const DATA_DIR = path.resolve(process.env.DATA_DIR || 'data');
 const LEGACY_DATA_FILE = path.resolve(process.env.DATA_FILE || 'planner-data.json');
@@ -14,6 +14,28 @@ const logsDir = path.resolve('logs');
 // Map key to individual file path
 const getFileForKey = (key) => path.join(DATA_DIR, `${key}.json`);
 const getLastGoodFileForKey = (key) => path.join(DATA_DIR, `${key}.last-good.json`);
+
+// Multer setup for file uploads
+import multer from 'multer';
+const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
+// Ensure uploads dir exists
+fs.mkdir(UPLOADS_DIR, { recursive: true }).catch(console.error);
+
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, UPLOADS_DIR)
+    },
+    filename: function (req, file, cb) {
+        // Sanitize and timestamp filename to prevent collisions
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + '-' + file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_'))
+    }
+})
+
+const upload = multer({ storage: storage });
+
+// Serve uploads statically
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 // In-memory lock for concurrency safety
 const locks = new Map();
@@ -162,6 +184,14 @@ app.post('/api/log/archive', async (req, res) => {
         console.error('Archive Error:', error);
         res.status(500).json({ error: error.message });
     }
+});
+
+app.post('/api/upload', upload.single('file'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+    // Return path relative to server root (which we serve at /uploads)
+    res.json({ path: `/uploads/${req.file.filename}` });
 });
 
 app.post('/api/storage/:key', async (req, res) => {
