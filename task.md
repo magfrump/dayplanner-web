@@ -19,5 +19,9 @@
 - [x] **Verify Fixes**: Re-run tests and linter to ensure a clean state. <!-- id: 8 -->
 
 # Feature Cycle: Version Control & Visualizations
-- [/] **Version Control Setup**: Initialize git, ignore private data, create dev branch.
-- [ ] **Data Visualization**: Implement `reactflow` node view.
+- [x] **Version Control Setup**: Initialize git, ignore private data, create dev branch.
+- [ ] **Data Visualization (React Flow)**: Implement node-link diagram for non-linear planning.
+    - [x] Install dependencies (`reactflow`, `dagre` for layout).
+    - [x] Design & Create `GraphView` component.
+    - [x] Implement data transformation (Planner Data -> Nodes/Edges).
+    - [x] Integrate into `DayPlanner` tabs.
