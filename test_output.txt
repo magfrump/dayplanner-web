@@ -1,0 +1,338 @@
+
+> dayplanner-web@0.0.0 test
+> vitest src/DayPlannerTools.test.tsx --reporter=verbose
+
+
+[1m[44m DEV [49m[22m [34mv4.0.16 [39m[90m/home/magfrump/autostructures/dayplanner-web[39m
+
+ [32m✓[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_value tool[32m 178[2mms[22m[39m
+ [32m✓[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal tool[32m 1[2mms[22m[39m
+ [31m×[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal and add_project tools[33m 5007[2mms[22m[39m
+[31m   → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+ [31m×[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_task with deadline and recurrence[33m 5004[2mms[22m[39m
+[31m   → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal and add_project tools
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/DayPlannerTools.test.tsx:[2m174:5[22m[39m
+    [90m172| [39m    })[33m;[39m
+    [90m173| [39m
+    [90m174| [39m    [34mit[39m([32m'should handle add_goal and add_project tools'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m   | [39m    [31m^[39m
+    [90m175| [39m        [35mconst[39m valueId [33m=[39m [34m1000[39m[33m;[39m
+    [90m176| [39m        [35mconst[39m goalId [33m=[39m [34m2000[39m[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_task with deadline and recurrence
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/DayPlannerTools.test.tsx:[2m269:5[22m[39m
+    [90m267| [39m    })[33m;[39m
+    [90m268| [39m
+    [90m269| [39m    it('should handle add_task with deadline and recurrence', async ()…
+    [90m   | [39m    [31m^[39m
+    [90m270| [39m        [35mconst[39m taskId [33m=[39m [34m4000[39m[33m;[39m
+    [90m271| [39m        // Not using fake timers here as it interferes with async wait…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 15:59:40
+[2m   Duration [22m 10.87s[2m (transform 161ms, setup 43ms, import 271ms, tests 10.19s, environment 259ms)[22m
+
+[1m[41m FAIL [49m[22m [31mTests failed. Watching for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2msrc/DayPlannerTools.test.tsx [22m[34mx1 [34m[39m
+       [2m Filename pattern: [22m[34msrc/DayPlannerTools.test.tsx[39m
+
+ [32m✓[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_value tool[33m 1403[2mms[22m[39m
+ [32m✓[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal tool[32m 2[2mms[22m[39m
+ [31m×[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal and add_project tools[33m 5008[2mms[22m[39m
+[31m   → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+ [31m×[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_task with deadline and recurrence[33m 5007[2mms[22m[39m
+[31m   → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal and add_project tools
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/DayPlannerTools.test.tsx:[2m174:5[22m[39m
+    [90m172| [39m    })[33m;[39m
+    [90m173| [39m
+    [90m174| [39m    [34mit[39m([32m'should handle add_goal and add_project tools'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m   | [39m    [31m^[39m
+    [90m175| [39m        [35mconst[39m valueId [33m=[39m [34m1000[39m[33m;[39m
+    [90m176| [39m        [35mconst[39m goalId [33m=[39m [34m2000[39m[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_task with deadline and recurrence
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/DayPlannerTools.test.tsx:[2m269:5[22m[39m
+    [90m267| [39m    })[33m;[39m
+    [90m268| [39m
+    [90m269| [39m    it('should handle add_task with deadline and recurrence', async ()…
+    [90m   | [39m    [31m^[39m
+    [90m270| [39m        [35mconst[39m taskId [33m=[39m [34m4000[39m[33m;[39m
+    [90m271| [39m        // Not using fake timers here as it interferes with async wait…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 16:00:27
+[2m   Duration [22m 13.41s
+
+[1m[41m FAIL [49m[22m [31mTests failed. Watching for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2msrc/DayPlannerTools.test.tsx [22m[34mx2 [34m[39m
+       [2m Filename pattern: [22m[34msrc/DayPlannerTools.test.tsx[39m
+
+ [32m✓[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_value tool[33m 783[2mms[22m[39m
+ [32m✓[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal tool[32m 1[2mms[22m[39m
+ [31m×[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal and add_project tools[32m 2[2mms[22m[39m
+[31m   → valueId is not defined[39m
+ [31m×[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_task with deadline and recurrence[33m 5002[2mms[22m[39m
+[31m   → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal and add_project tools
+[31m[1mReferenceError[22m: valueId is not defined[39m
+[36m [2m❯[22m src/DayPlannerTools.test.tsx:[2m192:85[22m[39m
+    [90m190| [39m                    id[33m:[39m [32m'call_2'[39m[33m,[39m
+    [90m191| [39m                    name[33m:[39m [32m'add_goal'[39m[33m,[39m
+    [90m192| [39m                    input: { name: 'Test Goal', description: 'Goal Des…
+    [90m   | [39m                                                                                    [31m^[39m
+    [90m193| [39m                }]
+    [90m194| [39m            })
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_task with deadline and recurrence
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/DayPlannerTools.test.tsx:[2m264:5[22m[39m
+    [90m262| [39m    })[33m;[39m
+    [90m263| [39m
+    [90m264| [39m    it('should handle add_task with deadline and recurrence', async ()…
+    [90m   | [39m    [31m^[39m
+    [90m265| [39m
+    [90m266| [39m        // Not using fake timers here as it interferes with async wait…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 16:00:57
+[2m   Duration [22m 7.13s
+
+[1m[41m FAIL [49m[22m [31mTests failed. Watching for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2msrc/DayPlannerTools.test.tsx [22m[34mx3 [34m[39m
+       [2m Filename pattern: [22m[34msrc/DayPlannerTools.test.tsx[39m
+
+ [32m✓[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_value tool[33m 1278[2mms[22m[39m
+ [32m✓[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal tool[32m 5[2mms[22m[39m
+ [31m×[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal and add_project tools[33m 5005[2mms[22m[39m
+[31m   → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+ [31m×[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_task with deadline and recurrence[33m 5005[2mms[22m[39m
+[31m   → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal and add_project tools
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/DayPlannerTools.test.tsx:[2m174:5[22m[39m
+    [90m172| [39m    })[33m;[39m
+    [90m173| [39m
+    [90m174| [39m    [34mit[39m([32m'should handle add_goal and add_project tools'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m   | [39m    [31m^[39m
+    [90m175| [39m        [35mconst[39m valueId [33m=[39m [34m1000[39m[33m;[39m
+    [90m176| [39m        [35mconst[39m goalId [33m=[39m [34m2000[39m[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_task with deadline and recurrence
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/DayPlannerTools.test.tsx:[2m267:5[22m[39m
+    [90m265| [39m    })[33m;[39m
+    [90m266| [39m
+    [90m267| [39m    it('should handle add_task with deadline and recurrence', async ()…
+    [90m   | [39m    [31m^[39m
+    [90m268| [39m
+    [90m269| [39m        // Not using fake timers here as it interferes with async wait…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 16:01:12
+[2m   Duration [22m 12.39s
+
+[1m[41m FAIL [49m[22m [31mTests failed. Watching for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2msrc/DayPlannerTools.test.tsx [22m[34mx4 [34m[39m
+       [2m Filename pattern: [22m[34msrc/DayPlannerTools.test.tsx[39m
+
+ [32m✓[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_value tool[33m 2357[2mms[22m[39m
+ [32m✓[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal tool[32m 3[2mms[22m[39m
+ [31m×[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal and add_project tools[33m 5006[2mms[22m[39m
+[31m   → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+ [31m×[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_task with deadline and recurrence[33m 5004[2mms[22m[39m
+[31m   → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal and add_project tools
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/DayPlannerTools.test.tsx:[2m174:5[22m[39m
+    [90m172| [39m    })[33m;[39m
+    [90m173| [39m
+    [90m174| [39m    [34mit[39m([32m'should handle add_goal and add_project tools'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m   | [39m    [31m^[39m
+    [90m175| [39m        [35mconst[39m valueId [33m=[39m [34m1000[39m[33m;[39m
+    [90m176| [39m        [35mconst[39m goalId [33m=[39m [34m2000[39m[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_task with deadline and recurrence
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/DayPlannerTools.test.tsx:[2m276:5[22m[39m
+    [90m274| [39m    })[33m;[39m
+    [90m275| [39m
+    [90m276| [39m    it('should handle add_task with deadline and recurrence', async ()…
+    [90m   | [39m    [31m^[39m
+    [90m277| [39m
+    [90m278| [39m        // Not using fake timers here as it interferes with async wait…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 16:02:13
+[2m   Duration [22m 14.37s
+
+[1m[41m FAIL [49m[22m [31mTests failed. Watching for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2msrc/DayPlannerTools.test.tsx [22m[34mx5 [34m[39m
+       [2m Filename pattern: [22m[34msrc/DayPlannerTools.test.tsx[39m
+
+ [32m✓[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_value tool[33m 881[2mms[22m[39m
+ [32m✓[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal tool[32m 1[2mms[22m[39m
+ [31m×[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal and add_project tools[33m 5004[2mms[22m[39m
+[31m   → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+ [31m×[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_task with deadline and recurrence[33m 5002[2mms[22m[39m
+[31m   → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal and add_project tools
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/DayPlannerTools.test.tsx:[2m174:5[22m[39m
+    [90m172| [39m    })[33m;[39m
+    [90m173| [39m
+    [90m174| [39m    [34mit[39m([32m'should handle add_goal and add_project tools'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m   | [39m    [31m^[39m
+    [90m175| [39m        [35mconst[39m valueId [33m=[39m [34m1000[39m[33m;[39m
+    [90m176| [39m        [35mconst[39m goalId [33m=[39m [34m2000[39m[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_task with deadline and recurrence
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/DayPlannerTools.test.tsx:[2m276:5[22m[39m
+    [90m274| [39m    })[33m;[39m
+    [90m275| [39m
+    [90m276| [39m    it('should handle add_task with deadline and recurrence', async ()…
+    [90m   | [39m    [31m^[39m
+    [90m277| [39m
+    [90m278| [39m        // Not using fake timers here as it interferes with async wait…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 16:02:38
+[2m   Duration [22m 13.23s
+
+[1m[41m FAIL [49m[22m [31mTests failed. Watching for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2msrc/DayPlannerTools.test.tsx [22m[34mx6 [34m[39m
+       [2m Filename pattern: [22m[34msrc/DayPlannerTools.test.tsx[39m
+
+ [32m✓[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_value tool[33m 742[2mms[22m[39m
+ [32m✓[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal tool[32m 2[2mms[22m[39m
+ [31m×[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal and add_project tools[33m 5005[2mms[22m[39m
+[31m   → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+ [31m×[39m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_task with deadline and recurrence[33m 5003[2mms[22m[39m
+[31m   → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_goal and add_project tools
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/DayPlannerTools.test.tsx:[2m174:5[22m[39m
+    [90m172| [39m    })[33m;[39m
+    [90m173| [39m
+    [90m174| [39m    [34mit[39m([32m'should handle add_goal and add_project tools'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m   | [39m    [31m^[39m
+    [90m175| [39m        [35mconst[39m valueId [33m=[39m [34m1000[39m[33m;[39m
+    [90m176| [39m        [35mconst[39m goalId [33m=[39m [34m2000[39m[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/DayPlannerTools.test.tsx[2m > [22mDayPlanner Tools[2m > [22mshould handle add_task with deadline and recurrence
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/DayPlannerTools.test.tsx:[2m276:5[22m[39m
+    [90m274| [39m    })[33m;[39m
+    [90m275| [39m
+    [90m276| [39m    it('should handle add_task with deadline and recurrence', async ()…
+    [90m   | [39m    [31m^[39m
+    [90m277| [39m
+    [90m278| [39m        // Not using fake timers here as it interferes with async wait…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 16:03:27
+[2m   Duration [22m 12.07s
+
+[1m[41m FAIL [49m[22m [31mTests failed. Watching for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m

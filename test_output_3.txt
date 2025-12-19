@@ -1,0 +1,7 @@
+
+> dayplanner-web@0.0.0 test
+> vitest src/DayPlannerTools.test.tsx --reporter=verbose
+
+
+[1m[44m DEV [49m[22m [34mv4.0.16 [39m[90m/home/magfrump/autostructures/dayplanner-web[39m
+
