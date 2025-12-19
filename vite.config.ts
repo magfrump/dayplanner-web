@@ -14,7 +14,7 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0', // Force bind to all network interfaces
-    port: 5173,
+    port: 5174,
     strictPort: true,
     proxy: {
       '/api/anthropic': {
@@ -35,11 +35,11 @@ export default defineConfig({
         },
       },
       '/api/storage': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3002',
         changeOrigin: true,
       },
       '/api/read-file': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3002',
         changeOrigin: true,
       }
     }

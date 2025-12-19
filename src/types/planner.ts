@@ -35,6 +35,7 @@ export interface Task {
     completed: boolean;
     deadline?: string;
     recurrence?: string;
+    attachments?: string[];
 }
 
 export interface Capacity {

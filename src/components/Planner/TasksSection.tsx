@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Plus, Edit2, Trash2, Calendar, Repeat } from 'lucide-react';
+import { Plus, Edit2, Trash2, Calendar, Repeat, Paperclip } from 'lucide-react';
 import type { Task, Project, Goal, Value } from '../../types/planner';
 import { WORK_TYPES } from '../../types/planner';
 
@@ -49,6 +49,12 @@ export const TasksSection: React.FC<TasksSectionProps> = ({
                                 <div className={task.completed ? 'line-through' : ''}>{task.name}</div>
                                 <div className="text-xs text-gray-500 flex flex-wrap gap-2 items-center mt-0.5">
                                     <span>{project?.name} • I:{task.importance} U:{task.urgency} • {workType.name}</span>
+                                    {task.attachments && task.attachments.length > 0 && (
+                                        <span className="flex items-center gap-0.5 text-blue-600 bg-blue-50 px-1 rounded">
+                                            <Paperclip size={10} />
+                                            {task.attachments.length}
+                                        </span>
+                                    )}
                                     {task.deadline && (
                                         <span className="flex items-center gap-1 text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded">
                                             <Calendar size={10} />

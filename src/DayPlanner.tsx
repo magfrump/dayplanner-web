@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Settings } from 'lucide-react';
 import { SettingsModal } from './components/SettingsModal';
 import { SummaryCard } from './components/Chat/SummaryCard';
+import GraphView from './components/Planner/GraphView';
 import { PlannerDataView } from './components/Planner/PlannerDataView';
 import { usePlannerData } from './hooks/usePlannerData';
 import { usePlannerAI } from './hooks/usePlannerAI';
@@ -327,6 +328,10 @@ const DayPlanner = () => {
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'data' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-gray-600 hover:bg-gray-100'}`}>
                     Data
                 </button>
+                <button onClick={() => setActiveTab('graph')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'graph' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-gray-600 hover:bg-gray-100'}`}>
+                    Map
+                </button>
                 <button onClick={() => setActiveTab('history')}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'history' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-gray-600 hover:bg-gray-100'}`}>
                     History
@@ -346,6 +351,17 @@ const DayPlanner = () => {
                         onEdit: handleStartEdit
                     }}
                 />
+            )}
+            {activeTab === 'graph' && (
+                <div className="h-[calc(100vh-12rem)]">
+                    <GraphView
+                        values={values}
+                        goals={goals}
+                        projects={projects}
+                        tasks={tasks}
+                        onEdit={handleStartEdit}
+                    />
+                </div>
             )}
             {activeTab === 'history' && <HistorySection tasks={tasks} projects={projects} goals={goals} values={values} />}
         </div>
