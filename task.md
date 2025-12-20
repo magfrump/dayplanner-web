@@ -35,7 +35,7 @@
     - [x] UI: Create `AttachmentList` and `FileUploader` components.
     - [x] UI: Integrate into `EditItemModal` and `TasksSection`.
 
-- [ ] **Automated Mood Sync**: Update Capacity based on Chat Sentiment.
-    - [ ] Logic: Update `summarizeConversation` in `usePlannerAI` to reading `mood_score`.
-    - [ ] Logic: Apply `mood_score` to `Capacity.mood` (and potentially inferred Stress).
-    - [ ] UI: Add visual feedback "Mood updated from chat context".
+- [x] **Automated Mood Sync**: Update Capacity based on Chat Sentiment.
+    - [x] Logic: Update `summarizeConversation` in `usePlannerAI` to reading `mood_score`.
+    - [x] Logic: Apply `mood_score` to `Capacity.mood` (and potentially inferred Stress).
+    - [x] UI: Add visual feedback "Mood updated from chat context".

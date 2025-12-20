@@ -151,10 +151,11 @@ export const sendSmartMessage = async (
     throw lastError || new Error('All accessible providers failed. Please check your API keys.');
 };
 
+// Update return type
 export const generateContextSummary = async (
     messages: Message[],
     llmConfig: LLMConfig
-): Promise<{ summary: string; mood: number; facts: string[] }> => {
+): Promise<{ summary: string; mood: number; stress?: number; energy?: number; physical?: number; facts: string[] }> => {
     // We want to summarize the set of messages. 
     // We'll use a specific tool definition to force structured output.
     const summaryTool: Tool = {
@@ -164,14 +165,17 @@ export const generateContextSummary = async (
             type: 'object',
             properties: {
                 summary: { type: 'string', description: 'A concise 1-paragraph summary of what happened, maintaining context for future tasks.' },
-                mood_score: { type: 'number', minimum: 1, maximum: 5, description: 'The user\'s estimated mood/energy during this segment (1=Low/Bad, 5=High/Good)' },
+                mood_score: { type: 'number', minimum: 1, maximum: 5, description: 'User mood (1=Low/Bad, 5=High/Good). null if unknown.' },
+                stress_score: { type: 'number', minimum: 1, maximum: 5, description: 'User stress (1=Low Stress, 5=High Stress). null if unknown.' },
+                energy_score: { type: 'number', minimum: 1, maximum: 5, description: 'User energy (1=Exhausted, 5=Energetic). null if unknown.' },
+                physical_score: { type: 'number', minimum: 1, maximum: 5, description: 'User physical readiness (1=Hurting/Sick, 5=Peak). null if unknown.' },
                 key_facts: {
                     type: 'array',
                     items: { type: 'string' },
-                    description: 'List of extraction-worthy facts or constraints mentioned (e.g. "Meeting at 5pm", "Project X is delayed"). Do not include opinions.'
+                    description: 'List of extraction-worthy facts or constraints mentioned. Do not include opinions.'
                 }
             },
-            required: ['summary', 'mood_score', 'key_facts']
+            required: ['summary', 'key_facts']
         }
     };
 
@@ -179,8 +183,8 @@ export const generateContextSummary = async (
         {
             role: 'user',
             content: `Please analyze the following conversation segment and summarize it to clear the context window. 
-            Extract key facts and estimate the user's mood. 
-            Ignore separate "venting" or emotional outbursts in the summary unless they are relevant to the user's state (mood score).
+            Extract key facts and estimate the user's current capacity metrics (1-5) IF there is evidence for them.
+            If a metric is not mentioned or implied, omit it or set to null.
             
             CONVERSATION SEGMENT:
             ${messages.map(m => `[${m.role.toUpperCase()}]: ${m.content}`).join('\n\n')}
@@ -191,7 +195,7 @@ export const generateContextSummary = async (
     try {
         const response = await sendSmartMessage(
             promptMessages,
-            "You are a helpful assistant responsible for maintaining context hygiene. Summarize the conversation.",
+            "You are a helpful assistant responsible for maintaining context hygiene. Summarize the conversation and track user state.",
             [summaryTool],
             llmConfig
         );
@@ -201,6 +205,9 @@ export const generateContextSummary = async (
             return {
                 summary: (toolCall.input.summary as string),
                 mood: (toolCall.input.mood_score as number),
+                stress: (toolCall.input.stress_score as number),
+                energy: (toolCall.input.energy_score as number),
+                physical: (toolCall.input.physical_score as number),
                 facts: (toolCall.input.key_facts as string[])
             };
         }

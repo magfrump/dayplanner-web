@@ -25,9 +25,10 @@ export const usePlannerAI = (
         tasks: Task[],
         capacity: Capacity
     },
-    actions: PlannerActions
+    actions: PlannerActions,
+    initialConversation?: Message[]
 ) => {
-    const [conversation, setConversation] = useState<Message[]>([{ role: 'assistant', content: getGreeting() }]);
+    const [conversation, setConversation] = useState<Message[]>(initialConversation || [{ role: 'assistant', content: getGreeting() }]);
     const [isLoading, setIsLoading] = useState(false);
     const [isSummarizing, setIsSummarizing] = useState(false);
     const [refreshSuggestions, setRefreshSuggestions] = useState<Suggestion[]>([]);
@@ -98,14 +99,37 @@ export const usePlannerAI = (
                 id: `summary-${Date.now()}`
             };
 
-            setConversation([summaryMessage, ...keepSlice]);
+            // Automated Capacity Sync
+            actions.setCapacity(prev => {
+                const next = { ...prev };
+                if (summaryResult.mood) next.mood = summaryResult.mood;
+                if (summaryResult.stress) next.stress = summaryResult.stress;
+                if (summaryResult.energy) next.energy = summaryResult.energy;
+                if (summaryResult.physical) next.physicalState = summaryResult.physical;
+                return next;
+            });
+
+            const updates: string[] = [];
+            if (summaryResult.mood) updates.push(`Mood: ${summaryResult.mood}/5`);
+            if (summaryResult.stress) updates.push(`Stress: ${summaryResult.stress}/5`);
+            if (summaryResult.energy) updates.push(`Energy: ${summaryResult.energy}/5`);
+            if (summaryResult.physical) updates.push(`Physical: ${summaryResult.physical}/5`);
+
+            const moodNotification: Message = {
+                role: 'system',
+                content: updates.length > 0
+                    ? `Context summarized. Stats updated based on chat: ${updates.join(', ')}`
+                    : `Context summarized.`
+            };
+
+            setConversation([summaryMessage, moodNotification, ...keepSlice]);
 
         } catch (error) {
             console.error("Auto-summarization failed:", error);
         } finally {
             setIsSummarizing(false);
         }
-    }, [conversation, isSummarizing, isLoading, llmConfig]);
+    }, [conversation, isSummarizing, isLoading, llmConfig, actions]);
 
     useEffect(() => {
         const timeout = setTimeout(() => summarizeConversation(false), 1000); // 1s debounce/delay after render
