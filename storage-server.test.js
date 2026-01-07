@@ -32,10 +32,12 @@ describe('Storage Server Integration', () => {
         try {
             await fs.unlink(TEST_DATA_FILE);
         } catch { }
-        // We could clean TEST_DIR too but that might be overkill per test if keys differ.
-        // But for safety:
-        const files = await fs.readdir(TEST_DIR);
-        for (const file of files) await fs.unlink(path.join(TEST_DIR, file));
+
+        // Clean TEST_DIR recursively to handle uploads folder or other subdirs
+        try {
+            await fs.rm(TEST_DIR, { recursive: true, force: true });
+        } catch { }
+        await fs.mkdir(TEST_DIR, { recursive: true });
 
         await initData();
     });

@@ -39,11 +39,12 @@ describe('Storage Server PATCH API', () => {
     });
 
     beforeEach(async () => {
-        // Reset data file (split files will be written by tests)
-        // await fs.writeFile(TEST_DATA_FILE, JSON.stringify({ 'planner-tasks': '[]' }));
         // Just ensure DIR clean?
-        const files = await fs.readdir(TEST_DIR);
-        for (const file of files) await fs.unlink(path.join(TEST_DIR, file));
+        // Use recursive rm and recreate to handle subdirectories like 'uploads'
+        try {
+            await fs.rm(TEST_DIR, { recursive: true, force: true });
+        } catch { }
+        await fs.mkdir(TEST_DIR, { recursive: true });
     });
 
     it('should add an item to the list', async () => {

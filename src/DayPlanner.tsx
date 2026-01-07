@@ -11,13 +11,16 @@ import { HistorySection } from './components/Planner/HistorySection';
 import { RefreshReviewModal } from './components/Planner/RefreshReviewModal';
 import { RefreshCw, Bug, Archive } from 'lucide-react'; // Import Icon
 import { TraceModal } from './components/TraceModal';
+import { ModeSwitcher } from './components/Planner/ModeSwitcher';
+import { CapacityDisplay } from './components/Planner/CapacityDisplay';
 import type { EditModeState } from './types/ui';
-import type { Value, Goal, Project, Task } from './types/planner';
+import type { Value, Goal, Project, Task, PlannerMode } from './types/planner';
 import type { TraceData } from './services/types';
 
 const DayPlanner = () => {
     const [activeTab, setActiveTab] = useState('plan');
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [mode, setMode] = useState<PlannerMode>('focusing');
 
     // UI State for Editing
     const [editMode, setEditMode] = useState<EditModeState>({ type: null, id: null, data: null });
@@ -37,7 +40,9 @@ const DayPlanner = () => {
         refreshSuggestions, setRefreshSuggestions, generateRefreshSuggestions
     } = usePlannerAI(
         { values, goals, projects, tasks, capacity },
-        { addItem, updateItem, deleteItem, setCapacity, toggleTask }
+        { addItem, updateItem, deleteItem, setCapacity, toggleTask },
+        undefined, // initialConversation
+        mode
     );
 
     const [userInput, setUserInput] = useState('');
@@ -145,44 +150,21 @@ const DayPlanner = () => {
         const recentText = conversation.slice(-3).map(m => m.content.toLowerCase()).join(' ');
         const focusedTask = tasks.find(t => recentText.includes(t.name.toLowerCase()));
         const focusedProject = projects.find(p => recentText.includes(p.name.toLowerCase())) ||
-            (focusedTask ? projects.find(p => p.id === focusedTask.projectId) : null);
+            (focusedTask ? projects.find(p => p.id === focusedTask.projectId) : undefined);
         const focusedGoal = goals.find(g => recentText.includes(g.name.toLowerCase())) ||
-            (focusedProject ? goals.find(g => g.id === focusedProject.goalId) : null);
+            (focusedProject ? goals.find(g => g.id === focusedProject.goalId) : undefined);
         const focusedValue = values.find(v => recentText.includes(v.name.toLowerCase())) ||
-            (focusedGoal ? values.find(v => v.id === focusedGoal.valueId) : null);
-
-        const hasFocus = focusedValue || focusedGoal || focusedProject || focusedTask;
-
+            (focusedGoal ? values.find(v => v.id === focusedGoal.valueId) : undefined);
         return (
             <div className="flex flex-col h-[calc(100vh-12rem)]">
-                {/* Capacity Quick View (Read Only / Small) */}
-                <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-gray-200/50 p-3 mb-3">
-                    <div className="flex justify-between items-start mb-2">
-                        <div className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Current State</div>
-                        {hasFocus && (
-                            <div className="flex flex-wrap gap-1 items-center text-[10px] px-2 py-0.5 rounded-lg border"
-                                style={{
-                                    backgroundColor: focusedValue ? `${focusedValue.color}10` : '#f9fafb',
-                                    borderColor: focusedValue ? `${focusedValue.color}30` : '#f3f4f6',
-                                    color: focusedValue ? focusedValue.color : '#6b7280'
-                                }}
-                            >
-                                <span className="font-bold opacity-70">Focus:</span>
-                                {focusedValue && <span className="font-medium">{focusedValue.name}</span>}
-                                {focusedGoal && <><span>→</span><span className="font-medium">{focusedGoal.name}</span></>}
-                                {focusedProject && <><span>→</span><span className="font-medium">{focusedProject.name}</span></>}
-                                {focusedTask && <><span>→</span><span className="font-bold underline decoration-2 underline-offset-2">{focusedTask.name}</span></>}
-                            </div>
-                        )}
-                    </div>
-                    <div className="grid grid-cols-5 gap-1 text-[10px]">
-                        <div><div className="text-gray-500">Energy</div><div className="font-bold text-gray-800">{capacity.energy}/5</div></div>
-                        <div><div className="text-gray-500">Mood</div><div className="font-bold text-gray-800">{capacity.mood}/5</div></div>
-                        <div><div className="text-gray-500">Stress</div><div className="font-bold text-gray-800">{capacity.stress}/5</div></div>
-                        <div><div className="text-gray-500">Physical</div><div className="font-bold text-gray-800">{capacity.physicalState}/5</div></div>
-                        <div><div className="text-gray-500">Hours</div><div className="font-bold text-gray-800">{capacity.timeAvailable}h</div></div>
-                    </div>
-                </div>
+                <ModeSwitcher mode={mode} setMode={setMode} />
+                <CapacityDisplay
+                    capacity={capacity}
+                    focusedValue={focusedValue}
+                    focusedGoal={focusedGoal}
+                    focusedProject={focusedProject}
+                    focusedTask={focusedTask}
+                />
 
                 {/* Chat Area */}
                 <div className="flex-1 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/50 overflow-hidden flex flex-col">
@@ -234,7 +216,11 @@ const DayPlanner = () => {
                                 value={userInput}
                                 onChange={(e) => setUserInput(e.target.value)}
                                 onKeyPress={handleKeyPress}
-                                placeholder="How are you feeling? What would you like to do?"
+                                placeholder={
+                                    mode === 'mapping' ? "What's on your mind? Let's get it all down..." :
+                                        mode === 'execution' ? "What step are you on? Need any help?" :
+                                            "How are you feeling? What would you like to do?"
+                                }
                                 className="flex-1 px-4 py-3 border border-gray-200 rounded-xl shadow-inner bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                                 disabled={isLoading}
                             />

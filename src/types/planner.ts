@@ -83,3 +83,5 @@ export interface Message {
     id?: string; // Optional, useful for keys
     traceData?: unknown; // For debugging
 }
+
+export type PlannerMode = 'mapping' | 'focusing' | 'execution';

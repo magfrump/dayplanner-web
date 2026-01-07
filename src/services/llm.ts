@@ -28,13 +28,16 @@ export const getProvider = (id: string): LLMProvider => {
 
             // Log Request
             try {
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { direction: _d, ...restTrace } = traceData;
+
                 await fetch('/api/log/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         direction: 'request',
                         provider: provider.id,
-                        ...traceData
+                        ...restTrace
                     })
                 });
             } catch (e) {

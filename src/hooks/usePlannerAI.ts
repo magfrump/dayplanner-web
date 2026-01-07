@@ -5,7 +5,7 @@ import { sendSmartMessage, generateContextSummary } from '../services/llm';
 import { buildSystemContext, getGreeting } from '../services/aiContext';
 import { checkDeadlines, checkRecurrence } from '../utils/refreshLogic';
 import { plannerTools } from '../services/plannerTools';
-import type { Value, Goal, Project, Task, Capacity, Suggestion } from '../types/planner';
+import type { Value, Goal, Project, Task, Capacity, Suggestion, PlannerMode } from '../types/planner';
 
 interface PlannerActions {
     addItem: (type: 'value' | 'goal' | 'project' | 'task', item: Omit<Value | Goal | Project | Task, 'id'>) => void;
@@ -26,7 +26,8 @@ export const usePlannerAI = (
         capacity: Capacity
     },
     actions: PlannerActions,
-    initialConversation?: Message[]
+    initialConversation?: Message[],
+    mode: PlannerMode = 'focusing'
 ) => {
     const [conversation, setConversation] = useState<Message[]>(initialConversation || [{ role: 'assistant', content: getGreeting() }]);
     const [isLoading, setIsLoading] = useState(false);
@@ -157,7 +158,7 @@ export const usePlannerAI = (
 
         try {
             // Note: Now using the imported context builder and passing the data object
-            const systemContext = buildSystemContext(updatedConversation, data);
+            const systemContext = buildSystemContext(updatedConversation, data, mode);
 
             // First LLM Call (Smart Fallback)
             const response = await sendSmartMessage(
@@ -316,7 +317,7 @@ export const usePlannerAI = (
                 tools.find(t => t.name === 'read_project_documents')!
             ];
 
-            const systemContext = buildSystemContext(conversation, data);
+            const systemContext = buildSystemContext(conversation, data, mode);
             const promptMessages: Message[] = [
                 {
                     role: 'user', content: `Analyze the user's planner data and suggest a "Daily Refresh".
