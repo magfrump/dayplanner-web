@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import type { Value, Goal, Project, Task, Capacity } from '../types/planner';
 import { initializeStorage } from '../utils/storagePolyfill';
+import { nextId } from '../utils/ids';
 
 initializeStorage();
 
@@ -89,7 +90,7 @@ export const usePlannerData = () => {
 
     // CRUD Operations
     const addItem = (type: 'value' | 'goal' | 'project' | 'task', item: Omit<Value | Goal | Project | Task, 'id'>) => {
-        const id = Date.now();
+        const id = nextId();
         const newItem = { ...item, id };
 
         switch (type) {

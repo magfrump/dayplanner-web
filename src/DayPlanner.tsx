@@ -3,24 +3,27 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Settings } from 'lucide-react';
 import { SettingsModal } from './components/SettingsModal';
 import { SummaryCard } from './components/Chat/SummaryCard';
+import { ChatMessage } from './components/Chat/ChatMessage';
 import GraphView from './components/Planner/GraphView';
 import { PlannerDataView } from './components/Planner/PlannerDataView';
 import { usePlannerData } from './hooks/usePlannerData';
 import { usePlannerAI } from './hooks/usePlannerAI';
 import { HistorySection } from './components/Planner/HistorySection';
 import { RefreshReviewModal } from './components/Planner/RefreshReviewModal';
-import { RefreshCw, Bug, Archive } from 'lucide-react'; // Import Icon
+import { RefreshCw, Archive } from 'lucide-react'; // Import Icon
 import { TraceModal } from './components/TraceModal';
-import { ModeSwitcher } from './components/Planner/ModeSwitcher';
-import { CapacityDisplay } from './components/Planner/CapacityDisplay';
+import { PlanControls } from './components/Planner/PlanControls';
 import type { EditModeState } from './types/ui';
-import type { Value, Goal, Project, Task, PlannerMode } from './types/planner';
+import type { Value, Goal, Project, Task, PlannerMode, FocusState } from './types/planner';
 import type { TraceData } from './services/types';
+import { resolveEffectiveFocus } from './utils/focus';
+import { nextId } from './utils/ids';
 
 const DayPlanner = () => {
     const [activeTab, setActiveTab] = useState('plan');
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [mode, setMode] = useState<PlannerMode>('focusing');
+    const [focus, setFocus] = useState<FocusState>({});
 
     // UI State for Editing
     const [editMode, setEditMode] = useState<EditModeState>({ type: null, id: null, data: null });
@@ -42,11 +45,21 @@ const DayPlanner = () => {
         { values, goals, projects, tasks, capacity },
         { addItem, updateItem, deleteItem, setCapacity, toggleTask },
         undefined, // initialConversation
-        mode
+        mode,
+        { focus, setFocus }
     );
 
     const [userInput, setUserInput] = useState('');
     const chatEndRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // Auto-resize textarea
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 150)}px`;
+        }
+    }, [userInput]);
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -90,7 +103,7 @@ const DayPlanner = () => {
     const handleAddClick = (type: 'value' | 'goal' | 'project' | 'task') => {
         // Initialize empty item structure based on type
         // Note: ID is set in usePlannerData.addItem, but we need temporary ID for the modal form
-        const tempId = Date.now();
+        const tempId = nextId();
         const newItem: Partial<Value & Goal & Project & Task> = { id: tempId, name: '', description: '' };
 
         if (type === 'value') newItem.color = '#6b7280';
@@ -135,7 +148,7 @@ const DayPlanner = () => {
         setUserInput('');
     };
 
-    const handleKeyPress = (e: React.KeyboardEvent) => {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSendMessage();
@@ -145,27 +158,13 @@ const DayPlanner = () => {
     // --- Render Views ---
 
     const renderPlanView = () => {
-        // Basic focus detection logic moved from original
-        // Ideally this should be in a hook or util if needed for rendering
-        const recentText = conversation.slice(-3).map(m => m.content.toLowerCase()).join(' ');
-        const focusedTask = tasks.find(t => recentText.includes(t.name.toLowerCase()));
-        const focusedProject = projects.find(p => recentText.includes(p.name.toLowerCase())) ||
-            (focusedTask ? projects.find(p => p.id === focusedTask.projectId) : undefined);
-        const focusedGoal = goals.find(g => recentText.includes(g.name.toLowerCase())) ||
-            (focusedProject ? goals.find(g => g.id === focusedProject.goalId) : undefined);
-        const focusedValue = values.find(v => recentText.includes(v.name.toLowerCase())) ||
-            (focusedGoal ? values.find(v => v.id === focusedGoal.valueId) : undefined);
+        const { focusedValue, focusedGoal, focusedProject, focusedTask } = resolveEffectiveFocus(
+            focus,
+            conversation,
+            { values, goals, projects, tasks }
+        );
         return (
-            <div className="flex flex-col h-[calc(100vh-12rem)]">
-                <ModeSwitcher mode={mode} setMode={setMode} />
-                <CapacityDisplay
-                    capacity={capacity}
-                    focusedValue={focusedValue}
-                    focusedGoal={focusedGoal}
-                    focusedProject={focusedProject}
-                    focusedTask={focusedTask}
-                />
-
+            <div className="flex h-[calc(100vh-12rem)] gap-4">
                 {/* Chat Area */}
                 <div className="flex-1 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/50 overflow-hidden flex flex-col">
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -175,23 +174,11 @@ const DayPlanner = () => {
                             }
 
                             return (
-                                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group relative`}>
-                                    <div className={`max-w-[80%] rounded-2xl px-5 py-3 shadow-sm ${msg.role === 'user'
-                                        ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white'
-                                        : 'bg-white border border-gray-100 text-gray-800'
-                                        }`}>
-                                        <div className="whitespace-pre-wrap">{msg.content}</div>
-                                    </div>
-                                    {msg.role === 'assistant' && !!msg.traceData && (
-                                        <button
-                                            onClick={() => setViewingTrace(msg.traceData as TraceData)}
-                                            className="absolute -right-8 top-2 p-1.5 text-gray-300 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-all"
-                                            title="View LLM Trace"
-                                        >
-                                            <Bug size={16} />
-                                        </button>
-                                    )}
-                                </div>
+                                <ChatMessage
+                                    key={idx}
+                                    message={msg}
+                                    onViewTrace={msg.role === 'assistant' ? setViewingTrace : undefined}
+                                />
                             );
                         })}
                         {isLoading && (
@@ -210,18 +197,19 @@ const DayPlanner = () => {
 
                     {/* Input Area */}
                     <div className="border-t p-4">
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
+                        <div className="flex gap-2 items-end">
+                            <textarea
+                                ref={textareaRef}
                                 value={userInput}
                                 onChange={(e) => setUserInput(e.target.value)}
-                                onKeyPress={handleKeyPress}
+                                onKeyDown={handleKeyDown}
                                 placeholder={
                                     mode === 'mapping' ? "What's on your mind? Let's get it all down..." :
                                         mode === 'execution' ? "What step are you on? Need any help?" :
                                             "How are you feeling? What would you like to do?"
                                 }
-                                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl shadow-inner bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl shadow-inner bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all resize-none overflow-hidden min-h-[50px]"
+                                rows={1}
                                 disabled={isLoading}
                             />
                             <button
@@ -235,6 +223,17 @@ const DayPlanner = () => {
                         </div>
                     </div>
                 </div>
+
+                <PlanControls
+                    mode={mode}
+                    setMode={setMode}
+                    capacity={capacity}
+                    focusedValue={focusedValue}
+                    focusedGoal={focusedGoal}
+                    focusedProject={focusedProject}
+                    focusedTask={focusedTask}
+                    onClearFocus={() => setFocus({})}
+                />
             </div>
         );
     };
@@ -283,10 +282,7 @@ const DayPlanner = () => {
             {isSettingsOpen && <SettingsModal
                 isOpen={true}
                 onClose={() => setIsSettingsOpen(false)}
-                onSave={(config) => {
-                    setLlmConfig(config);
-                    localStorage.setItem('planner-llm-config', JSON.stringify(config));
-                }}
+                onSave={setLlmConfig}
                 currentConfig={llmConfig}
             />}
 

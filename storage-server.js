@@ -215,6 +215,67 @@ app.post('/api/storage/:key', async (req, res) => {
     }
 });
 
+// Read a file for AI context. Sandboxed: must be inside uploads/, or listed in
+// some project's documents[]. Path is resolved before comparison so '..' tricks
+// can't escape the allowlist.
+const isReadFileAllowed = async (resolvedPath) => {
+    const uploadsResolved = path.resolve(UPLOADS_DIR);
+    if (resolvedPath === uploadsResolved || resolvedPath.startsWith(uploadsResolved + path.sep)) {
+        return true;
+    }
+
+    try {
+        const projectsFile = getFileForKey('planner-projects');
+        const content = await fs.readFile(projectsFile, 'utf-8');
+        const projects = JSON.parse(content);
+        if (Array.isArray(projects)) {
+            for (const project of projects) {
+                if (Array.isArray(project.documents)) {
+                    for (const docPath of project.documents) {
+                        if (typeof docPath === 'string' && path.resolve(docPath) === resolvedPath) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    } catch {
+        // Projects file missing or unreadable — no project allowlist available.
+    }
+
+    return false;
+};
+
+app.get('/api/read-file', async (req, res) => {
+    const filePath = req.query.path;
+    if (!filePath || typeof filePath !== 'string') {
+        return res.status(400).send('Missing path parameter');
+    }
+
+    try {
+        const absolutePath = path.resolve(filePath);
+
+        if (!(await isReadFileAllowed(absolutePath))) {
+            return res.status(403).send('Path not in allowlist');
+        }
+
+        const stats = await fs.stat(absolutePath);
+        if (!stats.isFile()) {
+            return res.status(400).send('Not a file');
+        }
+
+        if (stats.size > 100 * 1024) {
+            return res.status(400).send('File too large for AI context');
+        }
+
+        const content = await fs.readFile(absolutePath, 'utf-8');
+        res.json({ content });
+    } catch (error) {
+        console.error(`Error reading file ${filePath}:`, error);
+        res.status(500).send(`Failed to read file: ${error.message}`);
+    }
+});
+
 app.patch('/api/storage/:key', async (req, res) => {
     try {
         await acquireLock(req.params.key, async () => {
@@ -263,35 +324,6 @@ export { app, initData };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
     initData().then(() => {
-        // File Reading Endpoint for AI Context
-        app.get('/api/read-file', async (req, res) => {
-            const filePath = req.query.path;
-            if (!filePath || typeof filePath !== 'string') {
-                return res.status(400).send('Missing path parameter');
-            }
-
-            try {
-                const absolutePath = path.resolve(filePath);
-
-                // Basic security: Check file existence and stats
-                const stats = await fs.stat(absolutePath);
-                if (!stats.isFile()) {
-                    return res.status(400).send('Not a file');
-                }
-
-                // Limit size to avoid choking the LLM context (e.g., 100KB)
-                if (stats.size > 100 * 1024) {
-                    return res.status(400).send('File too large for AI context');
-                }
-
-                const content = await fs.readFile(absolutePath, 'utf-8');
-                res.json({ content });
-            } catch (error) {
-                console.error(`Error reading file ${filePath}:`, error);
-                res.status(500).send(`Failed to read file: ${error.message}`);
-            }
-        });
-
         app.listen(port, () => {
             console.log(`Server running at http://localhost:${port}`);
             console.log(`Data directory: ${DATA_DIR}`);

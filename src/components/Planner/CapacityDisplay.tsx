@@ -8,10 +8,11 @@ interface CapacityDisplayProps {
     focusedGoal?: Goal;
     focusedProject?: Project;
     focusedTask?: Task;
+    onClearFocus?: () => void;
 }
 
 export const CapacityDisplay: React.FC<CapacityDisplayProps> = ({
-    capacity, focusedValue, focusedGoal, focusedProject, focusedTask
+    capacity, focusedValue, focusedGoal, focusedProject, focusedTask, onClearFocus
 }) => {
     const hasFocus = focusedValue || focusedGoal || focusedProject || focusedTask;
 
@@ -32,6 +33,16 @@ export const CapacityDisplay: React.FC<CapacityDisplayProps> = ({
                         {focusedGoal && <><span>→</span><span className="font-medium">{focusedGoal.name}</span></>}
                         {focusedProject && <><span>→</span><span className="font-medium">{focusedProject.name}</span></>}
                         {focusedTask && <><span>→</span><span className="font-bold underline decoration-2 underline-offset-2">{focusedTask.name}</span></>}
+                        {onClearFocus && (
+                            <button
+                                onClick={onClearFocus}
+                                className="ml-1 opacity-50 hover:opacity-100 leading-none"
+                                title="Clear focus"
+                                aria-label="Clear focus"
+                            >
+                                ×
+                            </button>
+                        )}
                     </div>
                 )}
             </div>

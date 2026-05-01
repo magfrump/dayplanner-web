@@ -14,7 +14,7 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0', // Force bind to all network interfaces
-    port: 5174,
+    port: 5173,
     strictPort: true,
     proxy: {
       '/api/anthropic': {

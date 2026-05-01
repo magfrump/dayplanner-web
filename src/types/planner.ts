@@ -85,3 +85,17 @@ export interface Message {
 }
 
 export type PlannerMode = 'mapping' | 'focusing' | 'execution';
+
+export interface FocusState {
+    valueId?: number;
+    goalId?: number;
+    projectId?: number;
+    taskId?: number;
+}
+
+export interface ResolvedFocus {
+    focusedValue?: Value;
+    focusedGoal?: Goal;
+    focusedProject?: Project;
+    focusedTask?: Task;
+}

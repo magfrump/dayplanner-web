@@ -1,6 +1,7 @@
 
-import type { Value, Goal, Project, Task, Capacity, PlannerMode } from '../types/planner';
+import type { Value, Goal, Project, Task, Capacity, PlannerMode, FocusState, ResolvedFocus } from '../types/planner';
 import type { Message } from './types';
+import { resolveEffectiveFocus } from '../utils/focus';
 
 // Initial greeting based on time of day
 export const getGreeting = () => {
@@ -19,22 +20,15 @@ interface ContextData {
     stylePrompt?: string;
 }
 
-export const buildSystemContext = (currentConversation: Message[], data: ContextData, mode: PlannerMode = 'focusing') => {
-    const { values, goals, projects, tasks, capacity } = data;
+export const buildSystemContext = (
+    currentConversation: Message[],
+    data: ContextData,
+    mode: PlannerMode = 'focusing',
+    focus?: FocusState
+) => {
+    const { values, goals, projects, capacity } = data;
 
-    const detectFocus = () => {
-        const recentText = currentConversation.slice(-3).map((m: Message) => m.content.toLowerCase()).join(' ');
-        const focusedTask = tasks.find(t => recentText.includes(t.name.toLowerCase()));
-        const focusedProject = projects.find(p => recentText.includes(p.name.toLowerCase())) ||
-            (focusedTask ? projects.find(p => p.id === focusedTask.projectId) : undefined);
-        const focusedGoal = goals.find(g => recentText.includes(g.name.toLowerCase())) ||
-            (focusedProject ? goals.find(g => g.id === focusedProject.goalId) : undefined);
-        const focusedValue = values.find(v => recentText.includes(v.name.toLowerCase())) ||
-            (focusedGoal ? values.find(v => v.id === focusedGoal.valueId) : undefined);
-        return { focusedValue, focusedGoal, focusedProject, focusedTask };
-    };
-
-    const { focusedValue, focusedGoal, focusedProject, focusedTask } = detectFocus();
+    const { focusedValue, focusedGoal, focusedProject, focusedTask } = resolveEffectiveFocus(focus, currentConversation, data);
 
     const { visibleValues, visibleGoals, visibleProjects, visibleTasks, docsHeader } = getVisibleContextData(
         data,
@@ -140,9 +134,7 @@ ${data.stylePrompt ? `\nUSER STYLE INSTRUCTIONS:\n${data.stylePrompt}` : ''}`;
 export const getVisibleContextData = (
     data: ContextData,
     mode: PlannerMode,
-    focus: {
-        focusedValue?: Value, focusedGoal?: Goal, focusedProject?: Project, focusedTask?: Task
-    }
+    focus: ResolvedFocus
 ) => {
     const { values, goals, projects, tasks } = data;
     const { focusedProject, focusedTask } = focus;
