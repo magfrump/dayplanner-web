@@ -17,7 +17,7 @@ describe('Refresh Logic System Checks', () => {
         expect(suggestions).toHaveLength(1);
         expect(suggestions[0].type).toBe('urgency_update');
         expect(suggestions[0].targetId).toBe(2);
-        expect((suggestions[0].payload as any).urgency).toBe(5);
+        expect((suggestions[0].payload as { urgency: number }).urgency).toBe(5);
     });
 
     it('should NOT suggest urgency if already high', () => {
@@ -48,7 +48,7 @@ describe('Refresh Logic System Checks', () => {
         const suggestions = checkRecurrence(tasks);
         expect(suggestions).toHaveLength(1);
         expect(suggestions[0].type).toBe('new_recurring_task');
-        expect((suggestions[0].payload as any).name).toBe('Daily Standup');
+        expect((suggestions[0].payload as { name: string }).name).toBe('Daily Standup');
     });
 
     it('should ignore recurring task if active copy exists', () => {
