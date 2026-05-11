@@ -17,6 +17,7 @@
   "dependencies": {
     "@types/dagre": "^0.7.53",
     "@xyflow/react": "^12.10.0",
+    "better-sqlite3": "^12.9.0",
     "cors": "^2.8.5",
     "dagre": "^0.8.5",
     "express": "^5.2.1",

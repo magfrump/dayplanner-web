@@ -3,6 +3,14 @@ import cors from 'cors';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+    openDatabase,
+    snapshotIfStale,
+    insertSegment,
+    getSegment,
+    searchSegments,
+    countSegmentsByLineage,
+} from './multisemantic-db.js';
 
 const app = express();
 const port = 3002;
@@ -67,6 +75,10 @@ app.use((req, res, next) => {
     next();
 });
 
+// Holds the open SQLite handle for the segment store. Initialized in initData.
+let segmentDb = null;
+const MULTISEMANTIC_LOCK_KEY = '__multisemantic__';
+
 // Initialize data directory and migrate if needed
 async function initData() {
     try {
@@ -79,6 +91,16 @@ async function initData() {
         await fs.access(logsDir);
     } catch {
         await fs.mkdir(logsDir, { recursive: true });
+    }
+
+    if (segmentDb) {
+        try { segmentDb.close(); } catch { /* ignore */ }
+    }
+    segmentDb = openDatabase(DATA_DIR);
+    try {
+        await snapshotIfStale(DATA_DIR);
+    } catch (e) {
+        console.error('Initial multisemantic snapshot failed:', e);
     }
 
     // Migration: Check for legacy file
@@ -273,6 +295,69 @@ app.get('/api/read-file', async (req, res) => {
     } catch (error) {
         console.error(`Error reading file ${filePath}:`, error);
         res.status(500).send(`Failed to read file: ${error.message}`);
+    }
+});
+
+app.post('/api/segments', async (req, res) => {
+    try {
+        await acquireLock(MULTISEMANTIC_LOCK_KEY, async () => {
+            const segment = req.body;
+            if (!segment?.id || !segment?.thread_id || !segment?.metadata?.archive_file) {
+                res.status(400).json({ error: 'Missing required fields: id, thread_id, metadata.archive_file' });
+                return;
+            }
+            const existing = getSegment(segmentDb, segment.id);
+            if (existing) {
+                res.json({ success: true, segment: existing, duplicate: true });
+                return;
+            }
+            const inserted = insertSegment(segmentDb, segment);
+            try {
+                await snapshotIfStale(DATA_DIR);
+            } catch (e) {
+                console.error('Snapshot-after-insert failed:', e);
+            }
+            res.json({ success: true, segment: inserted });
+        });
+    } catch (error) {
+        console.error('Segment insert error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/segments/search', async (req, res) => {
+    try {
+        const { q, limit, valueId, goalId, projectId, taskId } = req.query;
+        const lineageFilter = {};
+        if (valueId != null) lineageFilter.valueId = Number(valueId);
+        if (goalId != null) lineageFilter.goalId = Number(goalId);
+        if (projectId != null) lineageFilter.projectId = Number(projectId);
+        if (taskId != null) lineageFilter.taskId = Number(taskId);
+
+        const results = searchSegments(segmentDb, {
+            query: typeof q === 'string' ? q : '',
+            lineageFilter: Object.keys(lineageFilter).length ? lineageFilter : null,
+            limit: limit ? Number(limit) : 10,
+        });
+        res.json({ results });
+    } catch (error) {
+        console.error('Segment search error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/segments/counts', async (req, res) => {
+    try {
+        const { level, ids } = req.query;
+        if (!level || !ids) {
+            return res.status(400).json({ error: 'Missing level or ids query params' });
+        }
+        const idList = String(ids).split(',').map(s => Number(s)).filter(n => Number.isFinite(n));
+        const counts = countSegmentsByLineage(segmentDb, level, idList);
+        res.json({ counts });
+    } catch (error) {
+        console.error('Segment counts error:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 
