@@ -9,6 +9,7 @@ import {
     insertSegment,
     searchSegments,
     countSegmentsByLineage,
+    LINEAGE_LEVELS,
 } from './multisemantic-db.js';
 
 const app = express();
@@ -188,7 +189,8 @@ app.post('/api/log/archive', async (req, res) => {
     try {
         const { messages, summary } = req.body;
         const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-        const archiveFile = path.join(logsDir, `chat_archive_${dateStr}.jsonl`);
+        const archiveFileName = `chat_archive_${dateStr}.jsonl`;
+        const archiveFile = path.join(logsDir, archiveFileName);
 
         const archiveEntry = {
             timestamp: new Date().toISOString(),
@@ -200,7 +202,10 @@ app.post('/api/log/archive', async (req, res) => {
             archiveFile,
             JSON.stringify(archiveEntry) + '\n'
         );
-        res.json({ success: true });
+        // Return the relative archive path so the segment write can attach the
+        // *actual* file the entry landed in — avoids client/server clock-drift
+        // disagreement near midnight UTC.
+        res.json({ success: true, archive_file: `logs/${archiveFileName}` });
     } catch (error) {
         console.error('Archive Error:', error);
         res.status(500).json({ error: error.message });
@@ -323,12 +328,11 @@ app.post('/api/segments', async (req, res) => {
 
 app.get('/api/segments/search', async (req, res) => {
     try {
-        const { q, limit, valueId, goalId, projectId, taskId } = req.query;
+        const { q, limit } = req.query;
         const lineageFilter = {};
-        if (valueId != null) lineageFilter.valueId = Number(valueId);
-        if (goalId != null) lineageFilter.goalId = Number(goalId);
-        if (projectId != null) lineageFilter.projectId = Number(projectId);
-        if (taskId != null) lineageFilter.taskId = Number(taskId);
+        for (const { key } of LINEAGE_LEVELS) {
+            if (req.query[key] != null) lineageFilter[key] = Number(req.query[key]);
+        }
 
         const results = searchSegments(segmentDb, {
             query: typeof q === 'string' ? q : '',

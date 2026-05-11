@@ -17,6 +17,7 @@
 
 import fs from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import { openDatabase, insertSegment, snapshotIfStale } from '../multisemantic-db.js';
 
@@ -63,6 +64,17 @@ export async function importArchives({ logsDir = LOGS_DIR, dataDir = DATA_DIR } 
         return threadIdsByDate.get(date);
     };
 
+    // Wrap each archive's worth of inserts in a single SQLite transaction.
+    // Without this, every INSERT is its own commit/fsync — orders of magnitude
+    // slower at 10k+ rows. better-sqlite3 caches the prepared statement inside
+    // insertSegment by SQL text, so explicit hoisting isn't needed.
+    const importBatch = db.transaction((segments) => {
+        for (const segment of segments) {
+            if (insertSegment(db, segment).inserted) inserted++;
+            else skipped++;
+        }
+    });
+
     for (const file of archiveFiles) {
         const match = ARCHIVE_REGEX.exec(file);
         const date = match[1];
@@ -72,6 +84,7 @@ export async function importArchives({ logsDir = LOGS_DIR, dataDir = DATA_DIR } 
         const content = await fs.readFile(fullPath, 'utf-8');
         const lines = content.split('\n').filter(Boolean);
 
+        const segments = [];
         for (const line of lines) {
             scanned++;
             let entry;
@@ -87,11 +100,12 @@ export async function importArchives({ logsDir = LOGS_DIR, dataDir = DATA_DIR } 
                 continue;
             }
 
-            const segment = {
+            const ts = entry.timestamp || `${date}T00:00:00.000Z`;
+            segments.push({
                 id: entry.summary_id || makeSegmentId(),
                 thread_id: threadFor(date),
-                created_at: entry.timestamp || `${date}T00:00:00.000Z`,
-                updated_at: entry.timestamp || `${date}T00:00:00.000Z`,
+                created_at: ts,
+                updated_at: ts,
                 transcript: entry.messages,
                 summary: typeof entry.summary === 'string' ? entry.summary : null,
                 lineage: {},
@@ -100,12 +114,10 @@ export async function importArchives({ logsDir = LOGS_DIR, dataDir = DATA_DIR } 
                     open_loop: false,
                     archive_file: relPath,
                 },
-            };
-
-            const result = insertSegment(db, segment);
-            if (result.inserted) inserted++;
-            else skipped++;
+            });
         }
+
+        importBatch(segments);
     }
 
     try {
@@ -118,10 +130,7 @@ export async function importArchives({ logsDir = LOGS_DIR, dataDir = DATA_DIR } 
     return { scanned, inserted, skipped, invalid };
 }
 
-const isMain = import.meta.url === `file://${process.argv[1]}` ||
-    import.meta.url.endsWith(process.argv[1] ?? '');
-
-if (isMain) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
     importArchives()
         .then(({ scanned, inserted, skipped, invalid }) => {
             console.log(`Cold-start import complete:`);

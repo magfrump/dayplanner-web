@@ -85,23 +85,21 @@ export const usePlannerAI = (
         setConversation(updatedConversation);
 
         // Debounced focus-change rotation: a new focus must persist for
-        // FOCUS_DEBOUNCE_TURNS turns before we rotate thread_id.
-        const resolved = resolveEffectiveFocus(focus, updatedConversation, data);
-        const currentKey = focusKey(resolved);
-        if (currentKey && currentKey !== lastFocusKeyRef.current) {
-            if (currentKey === pendingFocusKeyRef.current) {
-                pendingFocusTurnsRef.current += 1;
-                if (pendingFocusTurnsRef.current >= FOCUS_DEBOUNCE_TURNS) {
-                    setThreadId(makeThreadId());
-                    lastFocusKeyRef.current = currentKey;
-                    pendingFocusKeyRef.current = '';
-                    pendingFocusTurnsRef.current = 0;
-                }
-            } else {
-                pendingFocusKeyRef.current = currentKey;
-                pendingFocusTurnsRef.current = 1;
-            }
+        // FOCUS_DEBOUNCE_TURNS turns before we rotate thread_id. A turn with no
+        // inferred focus (currentKey === '') is a no-op so a brief off-topic
+        // message doesn't reset an in-progress debounce.
+        const currentKey = focusKey(resolveEffectiveFocus(focus, updatedConversation, data));
+        if (!currentKey) {
+            // no-op
         } else if (currentKey === lastFocusKeyRef.current) {
+            pendingFocusKeyRef.current = '';
+            pendingFocusTurnsRef.current = 0;
+        } else if (currentKey !== pendingFocusKeyRef.current) {
+            pendingFocusKeyRef.current = currentKey;
+            pendingFocusTurnsRef.current = 1;
+        } else if (++pendingFocusTurnsRef.current >= FOCUS_DEBOUNCE_TURNS) {
+            setThreadId(makeThreadId());
+            lastFocusKeyRef.current = currentKey;
             pendingFocusKeyRef.current = '';
             pendingFocusTurnsRef.current = 0;
         }

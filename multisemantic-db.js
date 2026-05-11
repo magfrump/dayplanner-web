@@ -6,6 +6,16 @@ const DB_FILENAME = 'multisemantic.sqlite';
 const SNAPSHOT_FILENAME = 'multisemantic.sqlite.last-good';
 const SNAPSHOT_TTL_MS = 24 * 60 * 60 * 1000;
 
+// Lineage level metadata. Single source of truth for the four (column, payload-key)
+// pairs used by every lineage-aware query, the row→segment mapper, and the
+// HTTP query-string parser in storage-server.js. Keep ordered value→task; consumers rely on it.
+export const LINEAGE_LEVELS = [
+    { name: 'value', col: 'value_id', key: 'valueId' },
+    { name: 'goal', col: 'goal_id', key: 'goalId' },
+    { name: 'project', col: 'project_id', key: 'projectId' },
+    { name: 'task', col: 'task_id', key: 'taskId' },
+];
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS segments (
   id TEXT PRIMARY KEY,
@@ -74,6 +84,10 @@ export function openDatabase(dataDir) {
     const dbPath = path.join(dataDir, DB_FILENAME);
     const db = new Database(dbPath);
     db.pragma('journal_mode = WAL');
+    // synchronous=NORMAL is the right value for WAL: durable across crashes,
+    // not durable across power loss — acceptable for this workload, and avoids
+    // an fsync per write that would otherwise dominate bulk-import time.
+    db.pragma('synchronous = NORMAL');
     db.pragma('foreign_keys = ON');
     db.exec(SCHEMA);
     return db;
@@ -129,20 +143,24 @@ INSERT OR IGNORE INTO segments (
 // Returns { segment, inserted }. `inserted` is false when a row with this id already
 // existed (INSERT OR IGNORE skipped the write); callers can use this to count
 // idempotent re-runs during cold-start import.
+//
+// Hot-path note: on the inserted path we synthesize the return value from the input
+// rather than re-SELECTing — halves SQLite work in the importer loop. On the duplicate
+// path we SELECT to give the caller the actually-stored row.
 export function insertSegment(db, segment) {
     const now = new Date().toISOString();
     const lineage = segment.lineage || {};
     const metadata = segment.metadata || {};
-    const transcriptJson = JSON.stringify(segment.transcript || []);
-    const transcriptText = extractTranscriptText(segment.transcript);
+    const created_at = segment.created_at || now;
+    const updated_at = segment.updated_at || now;
 
     const result = db.prepare(INSERT_SEGMENT_SQL).run({
         id: segment.id,
         thread_id: segment.thread_id,
-        created_at: segment.created_at || now,
-        updated_at: segment.updated_at || now,
-        transcript_json: transcriptJson,
-        transcript_text: transcriptText,
+        created_at,
+        updated_at,
+        transcript_json: JSON.stringify(segment.transcript || []),
+        transcript_text: extractTranscriptText(segment.transcript),
         summary: segment.summary ?? null,
         value_id: lineage.valueId ?? null,
         goal_id: lineage.goalId ?? null,
@@ -153,10 +171,32 @@ export function insertSegment(db, segment) {
         archive_file: metadata.archive_file,
     });
 
-    return {
-        segment: getSegment(db, segment.id),
-        inserted: result.changes > 0,
-    };
+    if (result.changes > 0) {
+        return {
+            segment: {
+                id: segment.id,
+                thread_id: segment.thread_id,
+                created_at,
+                updated_at,
+                transcript: segment.transcript || [],
+                summary: segment.summary ?? null,
+                lineage: {
+                    valueId: lineage.valueId ?? null,
+                    goalId: lineage.goalId ?? null,
+                    projectId: lineage.projectId ?? null,
+                    taskId: lineage.taskId ?? null,
+                },
+                metadata: {
+                    needs_classification: !!metadata.needs_classification,
+                    open_loop: !!metadata.open_loop,
+                    archive_file: metadata.archive_file,
+                },
+            },
+            inserted: true,
+        };
+    }
+
+    return { segment: getSegment(db, segment.id), inserted: false };
 }
 
 export function getSegment(db, id) {
@@ -165,6 +205,8 @@ export function getSegment(db, id) {
 }
 
 function rowToSegment(row) {
+    const lineage = {};
+    for (const { col, key } of LINEAGE_LEVELS) lineage[key] = row[col];
     return {
         id: row.id,
         thread_id: row.thread_id,
@@ -172,12 +214,7 @@ function rowToSegment(row) {
         updated_at: row.updated_at,
         transcript: JSON.parse(row.transcript_json),
         summary: row.summary,
-        lineage: {
-            valueId: row.value_id,
-            goalId: row.goal_id,
-            projectId: row.project_id,
-            taskId: row.task_id,
-        },
+        lineage,
         metadata: {
             needs_classification: !!row.needs_classification,
             open_loop: !!row.open_loop,
@@ -194,12 +231,7 @@ function buildLineageWhere(lineage) {
     if (!lineage) return { sql: '', params: {} };
     const clauses = [];
     const params = {};
-    for (const [col, key] of [
-        ['value_id', 'valueId'],
-        ['goal_id', 'goalId'],
-        ['project_id', 'projectId'],
-        ['task_id', 'taskId'],
-    ]) {
+    for (const { col, key } of LINEAGE_LEVELS) {
         if (lineage[key] != null) {
             clauses.push(`s.${col} = @${col}`);
             params[col] = lineage[key];
@@ -251,7 +283,7 @@ export function searchSegments(db, { query, lineageFilter, limit = 10 } = {}) {
 
 export function countSegmentsByLineage(db, level, ids) {
     if (!Array.isArray(ids) || ids.length === 0) return {};
-    const col = { value: 'value_id', goal: 'goal_id', project: 'project_id', task: 'task_id' }[level];
+    const col = LINEAGE_LEVELS.find(l => l.name === level)?.col;
     if (!col) throw new Error(`Unknown lineage level: ${level}`);
     const placeholders = ids.map(() => '?').join(',');
     const rows = db.prepare(

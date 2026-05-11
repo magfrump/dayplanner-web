@@ -54,43 +54,45 @@ export const useChatSummarizer = ({
 
             const summaryResult = await generateContextSummary(summarizeSlice, llmConfig);
 
-            await fetch('/api/log/archive', {
+            const archiveResp = await fetch('/api/log/archive', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ messages: summarizeSlice, summary: summaryResult })
             });
+            const archiveBody = await archiveResp.json().catch(() => ({}));
+            // Prefer the server-reported path so the segment lands on the *same* file the
+            // archive endpoint actually wrote to (avoids client/server midnight drift).
+            const archiveFile = archiveBody?.archive_file
+                ?? `logs/chat_archive_${new Date().toISOString().split('T')[0]}.jsonl`;
 
             // Best-effort segment write. Failure must not stop summarization: the in-conversation
             // summary message and the archive write proceed regardless (spec §4.3 placement policy).
+            // Fire-and-forget: awaiting would add a needless RTT to the user-visible flow.
             const segmentId = makeSegmentId();
             const resolved = resolveEffectiveFocus(focus, summarizeSlice, data);
-            const lineage = {
-                valueId: resolved.focusedValue?.id ?? null,
-                goalId: resolved.focusedGoal?.id ?? null,
-                projectId: resolved.focusedProject?.id ?? null,
-                taskId: resolved.focusedTask?.id ?? null,
-            };
-            const archiveFile = `logs/chat_archive_${new Date().toISOString().split('T')[0]}.jsonl`;
-            try {
-                await fetch('/api/segments', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        id: segmentId,
-                        thread_id: threadId,
-                        transcript: summarizeSlice,
-                        summary: summaryResult.summary,
-                        lineage,
-                        metadata: {
-                            needs_classification: false,
-                            open_loop: false,
-                            archive_file: archiveFile,
-                        },
-                    }),
-                });
-            } catch (segErr) {
+            fetch('/api/segments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: segmentId,
+                    thread_id: threadId,
+                    transcript: summarizeSlice,
+                    summary: summaryResult.summary,
+                    lineage: {
+                        valueId: resolved.focusedValue?.id ?? null,
+                        goalId: resolved.focusedGoal?.id ?? null,
+                        projectId: resolved.focusedProject?.id ?? null,
+                        taskId: resolved.focusedTask?.id ?? null,
+                    },
+                    metadata: {
+                        needs_classification: false,
+                        open_loop: false,
+                        archive_file: archiveFile,
+                    },
+                }),
+            }).catch(segErr => {
                 console.error('Segment write failed (continuing with summary):', segErr);
-            }
+            });
 
             const now = new Date().toISOString();
             const summaryMessage: Message = {
