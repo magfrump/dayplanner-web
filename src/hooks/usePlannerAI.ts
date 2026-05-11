@@ -1,12 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Message } from '../services/types';
 import { sendSmartMessage } from '../services/llm';
 import { buildSystemContext, getGreeting } from '../services/aiContext';
 import { allTools, executeToolCall, type PlannerActions, type ToolContext } from '../services/toolRegistry';
 import type { Value, Goal, Project, Task, Capacity, PlannerMode, FocusState } from '../types/planner';
+import { resolveEffectiveFocus } from '../utils/focus';
+import { focusKey, makeMessageId, makeThreadId } from '../utils/ids';
 import { useLLMConfig } from './useLLMConfig';
 import { useChatSummarizer } from './useChatSummarizer';
 import { useRefreshSuggestions } from './useRefreshSuggestions';
+
+// Focus must persist for this many consecutive turns before thread_id rotates.
+// Prevents thread fragmentation if focus thrashes briefly within a single train of thought.
+const FOCUS_DEBOUNCE_TURNS = 2;
 
 interface UsePlannerAIOptions {
     focus?: FocusState;
@@ -31,9 +37,16 @@ export const usePlannerAI = (
     const setFocus = options.setFocus ?? setInternalFocus;
 
     const [conversation, setConversation] = useState<Message[]>(
-        initialConversation || [{ role: 'assistant', content: getGreeting() }]
+        initialConversation || [{ role: 'assistant', content: getGreeting(), id: makeMessageId('assistant') }]
     );
     const [isLoading, setIsLoading] = useState(false);
+
+    const [threadId, setThreadId] = useState<string>(() => makeThreadId());
+    // Tracks the focusKey from the previous turn and a debounce counter so we only
+    // rotate thread_id once a new focus has persisted for FOCUS_DEBOUNCE_TURNS turns.
+    const lastFocusKeyRef = useRef<string>('');
+    const pendingFocusKeyRef = useRef<string>('');
+    const pendingFocusTurnsRef = useRef<number>(0);
 
     const { llmConfig, setLlmConfig } = useLLMConfig();
 
@@ -42,7 +55,10 @@ export const usePlannerAI = (
         setConversation,
         llmConfig,
         setCapacity: actions.setCapacity,
-        isLoading
+        isLoading,
+        threadId,
+        focus,
+        data,
     });
 
     const toolContext: ToolContext = { data, actions, setFocus };
@@ -64,9 +80,31 @@ export const usePlannerAI = (
         if (!userMessage.trim() || isLoading) return;
         setIsLoading(true);
 
-        const newUserMsg: Message = { role: 'user', content: userMessage };
+        const newUserMsg: Message = { role: 'user', content: userMessage, id: makeMessageId('user') };
         const updatedConversation = [...conversation, newUserMsg];
         setConversation(updatedConversation);
+
+        // Debounced focus-change rotation: a new focus must persist for
+        // FOCUS_DEBOUNCE_TURNS turns before we rotate thread_id.
+        const resolved = resolveEffectiveFocus(focus, updatedConversation, data);
+        const currentKey = focusKey(resolved);
+        if (currentKey && currentKey !== lastFocusKeyRef.current) {
+            if (currentKey === pendingFocusKeyRef.current) {
+                pendingFocusTurnsRef.current += 1;
+                if (pendingFocusTurnsRef.current >= FOCUS_DEBOUNCE_TURNS) {
+                    setThreadId(makeThreadId());
+                    lastFocusKeyRef.current = currentKey;
+                    pendingFocusKeyRef.current = '';
+                    pendingFocusTurnsRef.current = 0;
+                }
+            } else {
+                pendingFocusKeyRef.current = currentKey;
+                pendingFocusTurnsRef.current = 1;
+            }
+        } else if (currentKey === lastFocusKeyRef.current) {
+            pendingFocusKeyRef.current = '';
+            pendingFocusTurnsRef.current = 0;
+        }
 
         try {
             const systemContext = buildSystemContext(updatedConversation, data, mode, focus);
@@ -76,7 +114,7 @@ export const usePlannerAI = (
             if (response.toolCalls) {
                 for (const call of response.toolCalls) {
                     const content = await executeToolCall(call, toolContext);
-                    toolResults.push({ role: 'user', content });
+                    toolResults.push({ role: 'user', content, id: makeMessageId('tool') });
                 }
             }
 
@@ -86,7 +124,8 @@ export const usePlannerAI = (
                     {
                         role: 'assistant',
                         content: response.content || '(Tool Execution)',
-                        traceData: response.traceData
+                        traceData: response.traceData,
+                        id: makeMessageId('assistant'),
                     },
                     ...toolResults
                 ];
@@ -98,25 +137,35 @@ export const usePlannerAI = (
                     {
                         role: 'assistant',
                         content: response.content + (response.content ? '\n' : '') + followUp.content,
-                        traceData: followUp.traceData
+                        traceData: followUp.traceData,
+                        id: makeMessageId('assistant'),
                     }
                 ]);
             } else {
                 setConversation(prev => [
                     ...prev,
-                    { role: 'assistant', content: response.content, traceData: response.traceData }
+                    { role: 'assistant', content: response.content, traceData: response.traceData, id: makeMessageId('assistant') }
                 ]);
             }
         } catch (error: unknown) {
             console.error('Error calling LLM API:', error);
             setConversation(prev => [...prev, {
                 role: 'assistant',
-                content: `Error: ${error instanceof Error ? error.message : String(error)}`
+                content: `Error: ${error instanceof Error ? error.message : String(error)}`,
+                id: makeMessageId('assistant'),
             }]);
         } finally {
             setIsLoading(false);
         }
     };
+
+    // Seed lastFocusKeyRef on mount so the very first send doesn't see a spurious change.
+    useEffect(() => {
+        const resolved = resolveEffectiveFocus(focus, conversation, data);
+        lastFocusKeyRef.current = focusKey(resolved);
+        // intentional: only run once per hook lifetime
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return {
         conversation,

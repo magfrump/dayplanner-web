@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { LLMConfig, Message } from '../services/types';
-import type { Capacity } from '../types/planner';
+import type { Capacity, FocusState, Value, Goal, Project, Task } from '../types/planner';
 import { generateContextSummary } from '../services/llm';
+import { resolveEffectiveFocus } from '../utils/focus';
+import { makeMessageId, makeSegmentId } from '../utils/ids';
 
 interface SummarizerArgs {
     conversation: Message[];
@@ -10,6 +12,14 @@ interface SummarizerArgs {
     llmConfig: LLMConfig;
     setCapacity: Dispatch<SetStateAction<Capacity>>;
     isLoading: boolean;
+    threadId: string;
+    focus: FocusState;
+    data: {
+        values: Value[];
+        goals: Goal[];
+        projects: Project[];
+        tasks: Task[];
+    };
 }
 
 const AUTO_THRESHOLD = 25;
@@ -22,7 +32,10 @@ export const useChatSummarizer = ({
     setConversation,
     llmConfig,
     setCapacity,
-    isLoading
+    isLoading,
+    threadId,
+    focus,
+    data,
 }: SummarizerArgs) => {
     const [isSummarizing, setIsSummarizing] = useState(false);
 
@@ -47,6 +60,38 @@ export const useChatSummarizer = ({
                 body: JSON.stringify({ messages: summarizeSlice, summary: summaryResult })
             });
 
+            // Best-effort segment write. Failure must not stop summarization: the in-conversation
+            // summary message and the archive write proceed regardless (spec §4.3 placement policy).
+            const segmentId = makeSegmentId();
+            const resolved = resolveEffectiveFocus(focus, summarizeSlice, data);
+            const lineage = {
+                valueId: resolved.focusedValue?.id ?? null,
+                goalId: resolved.focusedGoal?.id ?? null,
+                projectId: resolved.focusedProject?.id ?? null,
+                taskId: resolved.focusedTask?.id ?? null,
+            };
+            const archiveFile = `logs/chat_archive_${new Date().toISOString().split('T')[0]}.jsonl`;
+            try {
+                await fetch('/api/segments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: segmentId,
+                        thread_id: threadId,
+                        transcript: summarizeSlice,
+                        summary: summaryResult.summary,
+                        lineage,
+                        metadata: {
+                            needs_classification: false,
+                            open_loop: false,
+                            archive_file: archiveFile,
+                        },
+                    }),
+                });
+            } catch (segErr) {
+                console.error('Segment write failed (continuing with summary):', segErr);
+            }
+
             const now = new Date().toISOString();
             const summaryMessage: Message = {
                 role: 'system',
@@ -56,9 +101,10 @@ export const useChatSummarizer = ({
                     timestamp_start: now,
                     timestamp_end: now,
                     mood_score: summaryResult.mood,
-                    key_facts: summaryResult.facts
+                    key_facts: summaryResult.facts,
+                    segmentId,
                 },
-                id: `summary-${Date.now()}`
+                id: makeMessageId('summary')
             };
 
             setCapacity(prev => {
@@ -80,7 +126,8 @@ export const useChatSummarizer = ({
                 role: 'system',
                 content: updates.length > 0
                     ? `Context summarized. Stats updated based on chat: ${updates.join(', ')}`
-                    : `Context summarized.`
+                    : `Context summarized.`,
+                id: makeMessageId('system'),
             };
 
             setConversation([summaryMessage, moodNotification, ...keepSlice]);
@@ -89,7 +136,7 @@ export const useChatSummarizer = ({
         } finally {
             setIsSummarizing(false);
         }
-    }, [conversation, isSummarizing, isLoading, llmConfig, setCapacity, setConversation]);
+    }, [conversation, isSummarizing, isLoading, llmConfig, setCapacity, setConversation, threadId, focus, data]);
 
     useEffect(() => {
         const timeout = setTimeout(() => summarizeConversation(false), 1000);

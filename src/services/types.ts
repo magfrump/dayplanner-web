@@ -7,6 +7,7 @@ export type Message = {
         timestamp_end: string;
         mood_score: number;
         key_facts: string[];
+        segmentId?: string;
     };
     id?: string;
     traceData?: unknown;
