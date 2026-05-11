@@ -39,8 +39,8 @@ afterEach(() => {
 
 const mockData = {
     values: [{ id: 1, name: 'Health', description: '' }],
-    goals: [{ id: 10, name: 'Run a marathon', valueId: 1, description: '', timeframe: '' }],
-    projects: [{ id: 100, name: 'Training plan', goalId: 10, description: '', status: 'in_progress' as const }],
+    goals: [{ id: 10, name: 'Run a marathon', valueId: 1, description: '', timeframe: '', completed: false }],
+    projects: [{ id: 100, name: 'Training plan', goalId: 10, description: '', status: 'in_progress' as const, completed: false }],
     tasks: [{ id: 1000, name: 'Long run Saturday', projectId: 100, urgency: 3, importance: 3, workType: 'focus' as const, completed: false }],
     capacity: { energy: 3, mood: 3, stress: 3, timeAvailable: 4, physicalState: 3 },
 };

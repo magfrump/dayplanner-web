@@ -38,10 +38,10 @@ afterEach(() => {
 
 const data = {
     values: [{ id: 1, name: 'Health', description: '' }],
-    goals: [{ id: 10, name: 'Run a marathon', valueId: 1, description: '', timeframe: '' }],
+    goals: [{ id: 10, name: 'Run a marathon', valueId: 1, description: '', timeframe: '', completed: false }],
     projects: [
-        { id: 100, name: 'Training plan', goalId: 10, description: '', status: 'in_progress' as const },
-        { id: 200, name: 'Other project', goalId: 10, description: '', status: 'in_progress' as const },
+        { id: 100, name: 'Training plan', goalId: 10, description: '', status: 'in_progress' as const, completed: false },
+        { id: 200, name: 'Other project', goalId: 10, description: '', status: 'in_progress' as const, completed: false },
     ],
     tasks: [],
     capacity: { energy: 3, mood: 3, stress: 3, timeAvailable: 4, physicalState: 3 },
