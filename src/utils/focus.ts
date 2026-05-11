@@ -1,5 +1,5 @@
 import type { Value, Goal, Project, Task, FocusState, ResolvedFocus } from '../types/planner';
-import type { Message } from '../services/types';
+import type { Message, SegmentLineage } from '../services/types';
 
 interface FocusData {
     values: Value[];
@@ -54,3 +54,10 @@ export const resolveEffectiveFocus = (
     if (!isFocusEmpty(focus)) return resolveExplicitFocus(focus!, data);
     return inferFocusFromMessages(messages, data);
 };
+
+export const lineageFromResolved = (r: ResolvedFocus): SegmentLineage => ({
+    valueId: r.focusedValue?.id ?? null,
+    goalId: r.focusedGoal?.id ?? null,
+    projectId: r.focusedProject?.id ?? null,
+    taskId: r.focusedTask?.id ?? null,
+});

@@ -281,6 +281,57 @@ export function searchSegments(db, { query, lineageFilter, limit = 10 } = {}) {
     return db.prepare(sql).all({ ...lineageParams, limit }).map(rowToSegment);
 }
 
+// query_hash is a deterministic fingerprint of query text only (no secrets) used to
+// deduplicate identical (query, segment, retrieved_at) tuples via the table's UNIQUE
+// constraint. INSERT OR IGNORE makes duplicate writes within the same ms a no-op.
+export function recordRetrievalFeedback(db, { query, segmentIds, helpful = 1, contributingIndexes = ['bm25_fts'] }) {
+    if (!Array.isArray(segmentIds) || segmentIds.length === 0) return { inserted: 0 };
+    const retrievedAt = new Date().toISOString();
+    const queryText = String(query ?? '');
+    const queryHash = simpleHash(queryText);
+    const contribStr = JSON.stringify(contributingIndexes);
+
+    const stmt = db.prepare(`
+        INSERT OR IGNORE INTO retrieval_feedback
+            (query_hash, query_text, segment_id, retrieved_at, helpful, contributing_indexes)
+        VALUES (@query_hash, @query_text, @segment_id, @retrieved_at, @helpful, @contributing_indexes)
+    `);
+
+    let inserted = 0;
+    const tx = db.transaction(() => {
+        for (const segmentId of segmentIds) {
+            const result = stmt.run({
+                query_hash: queryHash,
+                query_text: queryText,
+                segment_id: segmentId,
+                retrieved_at: retrievedAt,
+                helpful: helpful ? 1 : 0,
+                contributing_indexes: contribStr,
+            });
+            if (result.changes > 0) inserted++;
+        }
+    });
+    tx();
+    return { inserted };
+}
+
+// 32-bit FNV-1a. Sufficient for the uniqueness role here (de-duping
+// (query, segment, second) tuples) — not used for security or cross-host stability.
+function simpleHash(s) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 0x01000193);
+    }
+    return (h >>> 0).toString(16);
+}
+
+export function getFeedbackForSegment(db, segmentId) {
+    return db.prepare(
+        'SELECT id, query_hash, query_text, retrieved_at, helpful, contributing_indexes FROM retrieval_feedback WHERE segment_id = ? ORDER BY retrieved_at DESC'
+    ).all(segmentId);
+}
+
 export function countSegmentsByLineage(db, level, ids) {
     if (!Array.isArray(ids) || ids.length === 0) return {};
     const col = LINEAGE_LEVELS.find(l => l.name === level)?.col;

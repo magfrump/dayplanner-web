@@ -149,4 +149,27 @@ describe('Multisemantic segment store', () => {
         const r = await request(app).post('/api/segments').send({ id: 'x' });
         expect(r.status).toBe(400);
     });
+
+    describe('/api/retrieval_feedback', () => {
+        beforeEach(async () => {
+            await request(app).post('/api/segments').send(makeSegment({ id: 'seg-fb-1' })).expect(200);
+            await request(app).post('/api/segments').send(makeSegment({ id: 'seg-fb-2' })).expect(200);
+        });
+
+        it('inserts one helpful=1 row per segment_id', async () => {
+            const r = await request(app).post('/api/retrieval_feedback').send({
+                query: 'training plan',
+                segment_ids: ['seg-fb-1', 'seg-fb-2'],
+                helpful: 1,
+            });
+            expect(r.status).toBe(200);
+            expect(r.body.success).toBe(true);
+            expect(r.body.inserted).toBe(2);
+        });
+
+        it('rejects requests without segment_ids', async () => {
+            const r = await request(app).post('/api/retrieval_feedback').send({ query: 'x' });
+            expect(r.status).toBe(400);
+        });
+    });
 });

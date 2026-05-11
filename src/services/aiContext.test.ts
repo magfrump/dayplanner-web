@@ -30,7 +30,7 @@ describe('buildSystemContext Data Filtering', () => {
     const baseMsg: Message[] = [{ role: 'user', content: 'Hello' }];
 
     it('should show everything in Focusing mode (default)', () => {
-        const context = buildSystemContext(baseMsg, data, 'focusing');
+        const context = buildSystemContext(baseMsg, data, { mode: 'focusing' });
 
         expect(context).toContain('Health');
         expect(context).toContain('Career');
@@ -41,7 +41,7 @@ describe('buildSystemContext Data Filtering', () => {
     });
 
     it('should filter tasks in Mapping mode', () => {
-        const context = buildSystemContext(baseMsg, data, 'mapping');
+        const context = buildSystemContext(baseMsg, data, { mode: 'mapping' });
 
         // Should show all values/goals/projects
         expect(context).toContain('Health');
@@ -63,7 +63,7 @@ describe('buildSystemContext Data Filtering', () => {
     it('should isolate lineage in Execution mode when task is focused', () => {
         // Conversation sets focus on "Run 5k" (id: 1002)
         const msgs: Message[] = [{ role: 'user', content: 'I am working on Run 5k' }];
-        const context = buildSystemContext(msgs, data, 'execution');
+        const context = buildSystemContext(msgs, data, { mode: 'execution' });
 
         // Focused: Run 5k (Project: Training Plan, Goal: Run Marathon, Value: Health)
         expect(context).toContain('Health');
@@ -91,10 +91,57 @@ describe('buildSystemContext Data Filtering', () => {
     it('should fallback to all in Execution mode if no focus detected', () => {
         const msgs: Message[] = [{ role: 'user', content: 'Just chilling' }];
         // No match for "Just chilling"
-        const context = buildSystemContext(msgs, data, 'execution');
+        const context = buildSystemContext(msgs, data, { mode: 'execution' });
 
         // Fallback behavior: Show all (as per empty else block in code)
         expect(context).toContain('Health');
         expect(context).toContain('Career');
+    });
+
+    describe('RELEVANT PAST CONTEXT injection (Phase 3)', () => {
+        it('omits the section when retrieved is undefined', () => {
+            const context = buildSystemContext(baseMsg, data, { mode: 'focusing' });
+            expect(context).not.toContain('RELEVANT PAST CONTEXT');
+        });
+
+        it('omits the section when retrieved is null', () => {
+            const context = buildSystemContext(baseMsg, data, { mode: 'focusing', retrieved: null });
+            expect(context).not.toContain('RELEVANT PAST CONTEXT');
+        });
+
+        it('injects the section with one bullet per segment when provided', () => {
+            const retrieved = {
+                segments: [
+                    {
+                        id: 'seg-AAA',
+                        thread_id: 't1',
+                        created_at: '2026-05-01T00:00:00.000Z',
+                        updated_at: '2026-05-01T00:00:00.000Z',
+                        transcript: [],
+                        summary: 'Past discussion about shoes',
+                        lineage: { projectId: 100, valueId: 1, goalId: 10, taskId: null },
+                        metadata: { needs_classification: false, open_loop: false, archive_file: 'logs/x.jsonl' },
+                    },
+                    {
+                        id: 'seg-BBB',
+                        thread_id: 't1',
+                        created_at: '2026-05-05T00:00:00.000Z',
+                        updated_at: '2026-05-05T00:00:00.000Z',
+                        transcript: [],
+                        summary: 'Past discussion about running route',
+                        lineage: { projectId: 100, valueId: 1, goalId: 10, taskId: null },
+                        metadata: { needs_classification: false, open_loop: false, archive_file: 'logs/y.jsonl' },
+                    },
+                ],
+                lineage: { projectId: 100, valueId: 1, goalId: 10, taskId: null },
+                freshness: '2026-05-05T00:00:00.000Z',
+            };
+            const context = buildSystemContext(baseMsg, data, { mode: 'focusing', retrieved });
+            expect(context).toContain('RELEVANT PAST CONTEXT');
+            expect(context).toContain('seg-AAA');
+            expect(context).toContain('Past discussion about shoes');
+            expect(context).toContain('seg-BBB');
+            expect(context).toContain('Past discussion about running route');
+        });
     });
 });

@@ -1,5 +1,7 @@
 import type { Tool, ToolCall } from './types';
 import type { Value, Goal, Project, Task, Capacity, FocusState } from '../types/planner';
+import type { Segment } from './multisemanticRetrieval';
+import { LINEAGE_KEYS } from './lineageKeys';
 
 export interface PlannerActions {
     addItem: (type: 'value' | 'goal' | 'project' | 'task', item: Omit<Value | Goal | Project | Task, 'id'>) => void;
@@ -280,6 +282,62 @@ const entries: ToolEntry[] = [
         handler: (input, ctx) => {
             ctx.actions.updateItem('task', { id: input.task_id, ...input });
             return ok('update_task');
+        }
+    },
+    {
+        definition: {
+            name: 'recall_segments',
+            description: 'Search past conversation segments (BM25 over summarized transcripts). Use when you need historical context about a topic, project, or task. Returns summaries only by default; pass includeTranscript=true to fetch full transcripts.',
+            input_schema: {
+                type: 'object',
+                properties: {
+                    query: { type: 'string', description: 'Free-text query. Trigram-tokenized FTS5 — identifier-style tokens (snake_case, dotted paths) are fine.' },
+                    lineageFilter: {
+                        type: 'object',
+                        description: 'Optional strict-AND lineage filter. Set any subset of {valueId, goalId, projectId, taskId}.',
+                        properties: {
+                            valueId: { type: 'number' },
+                            goalId: { type: 'number' },
+                            projectId: { type: 'number' },
+                            taskId: { type: 'number' }
+                        }
+                    },
+                    limit: { type: 'number', description: 'Max results (default 10).' },
+                    includeTranscript: { type: 'boolean', description: 'When true, attach full transcript to each result. Default false (summaries only).' }
+                },
+                required: ['query']
+            }
+        },
+        handler: async (input) => {
+            const params = new URLSearchParams();
+            if (typeof input.query === 'string' && input.query.trim()) params.set('q', input.query);
+            const lineage = input.lineageFilter || {};
+            for (const k of LINEAGE_KEYS) {
+                if (lineage[k] != null) params.set(k, String(lineage[k]));
+            }
+            params.set('limit', String(typeof input.limit === 'number' ? input.limit : 10));
+
+            try {
+                const resp = await fetch(`/api/segments/search?${params.toString()}`);
+                if (!resp.ok) return `recall_segments error: ${resp.status} ${resp.statusText}`;
+                const body = await resp.json();
+                const results: Segment[] = Array.isArray(body?.results) ? body.results : [];
+                const shaped = results.map(s => {
+                    const base = {
+                        id: s.id,
+                        thread_id: s.thread_id,
+                        summary: s.summary,
+                        lineage: s.lineage,
+                        created_at: s.created_at,
+                        archive_file: s.metadata?.archive_file,
+                    };
+                    return input.includeTranscript ? { ...base, transcript: s.transcript } : base;
+                });
+                return JSON.stringify({ count: shaped.length, results: shaped });
+            } catch (e: unknown) {
+                const msg = e instanceof Error ? e.message : String(e);
+                return `recall_segments error: ${msg}`;
+            }
         }
     },
     {

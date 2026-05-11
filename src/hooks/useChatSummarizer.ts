@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { LLMConfig, Message } from '../services/types';
 import type { Capacity, FocusState, Value, Goal, Project, Task } from '../types/planner';
 import { generateContextSummary } from '../services/llm';
-import { resolveEffectiveFocus } from '../utils/focus';
+import { resolveEffectiveFocus, lineageFromResolved } from '../utils/focus';
 import { makeMessageId, makeSegmentId } from '../utils/ids';
 
 interface SummarizerArgs {
@@ -69,7 +69,7 @@ export const useChatSummarizer = ({
             // summary message and the archive write proceed regardless (spec §4.3 placement policy).
             // Fire-and-forget: awaiting would add a needless RTT to the user-visible flow.
             const segmentId = makeSegmentId();
-            const resolved = resolveEffectiveFocus(focus, summarizeSlice, data);
+            const lineage = lineageFromResolved(resolveEffectiveFocus(focus, summarizeSlice, data));
             fetch('/api/segments', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -78,12 +78,7 @@ export const useChatSummarizer = ({
                     thread_id: threadId,
                     transcript: summarizeSlice,
                     summary: summaryResult.summary,
-                    lineage: {
-                        valueId: resolved.focusedValue?.id ?? null,
-                        goalId: resolved.focusedGoal?.id ?? null,
-                        projectId: resolved.focusedProject?.id ?? null,
-                        taskId: resolved.focusedTask?.id ?? null,
-                    },
+                    lineage,
                     metadata: {
                         needs_classification: false,
                         open_loop: false,

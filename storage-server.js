@@ -9,6 +9,7 @@ import {
     insertSegment,
     searchSegments,
     countSegmentsByLineage,
+    recordRetrievalFeedback,
     LINEAGE_LEVELS,
 } from './multisemantic-db.js';
 
@@ -342,6 +343,28 @@ app.get('/api/segments/search', async (req, res) => {
         res.json({ results });
     } catch (error) {
         console.error('Segment search error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/retrieval_feedback', async (req, res) => {
+    try {
+        await acquireLock(MULTISEMANTIC_LOCK_KEY, async () => {
+            const { query, segment_ids, helpful, contributing_indexes } = req.body || {};
+            if (!Array.isArray(segment_ids) || segment_ids.length === 0) {
+                res.status(400).json({ error: 'segment_ids must be a non-empty array' });
+                return;
+            }
+            const result = recordRetrievalFeedback(segmentDb, {
+                query,
+                segmentIds: segment_ids,
+                helpful: helpful == null ? 1 : Number(helpful),
+                contributingIndexes: Array.isArray(contributing_indexes) ? contributing_indexes : undefined,
+            });
+            res.json({ success: true, inserted: result.inserted });
+        });
+    } catch (error) {
+        console.error('Retrieval feedback error:', error);
         res.status(500).json({ error: error.message });
     }
 });

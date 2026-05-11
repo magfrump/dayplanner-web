@@ -12,6 +12,9 @@ interface SettingsModalProps {
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onSave, currentConfig }) => {
     const [providerId, setProviderId] = useState(currentConfig.provider);
+    const [enableRelevantPastContext, setEnableRelevantPastContext] = useState<boolean>(
+        currentConfig.enableRelevantPastContext ?? false,
+    );
 
     // Initialize derived state correctly
     const [allConfigs, setAllConfigs] = useState<Record<string, Record<string, string>>>(() => {
@@ -64,7 +67,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
             provider: providerId,
             config: currentValues,
             providerConfigs: updatedConfigs,
-            stylePrompt: currentValues.stylePrompt // Save root level
+            stylePrompt: currentValues.stylePrompt, // Save root level
+            enableRelevantPastContext,
         });
         onClose();
     };
@@ -103,6 +107,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                             className="w-full px-4 py-3 border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white transition-all h-24 resize-none"
                             placeholder="E.g., 'Be concise', 'Talk like a pirate', 'Focus on time blocking'..."
                         />
+                    </div>
+
+                    <div>
+                        <label className="flex items-start gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={enableRelevantPastContext}
+                                onChange={(e) => setEnableRelevantPastContext(e.target.checked)}
+                                className="mt-1"
+                            />
+                            <span className="text-sm">
+                                <span className="font-medium">Inject relevant past context</span>
+                                <span className="block text-xs text-gray-500">
+                                    Searches past summarized conversations matching the active focus and adds the top results to the system prompt. Off by default until the §6 baseline measurement completes.
+                                </span>
+                            </span>
+                        </label>
                     </div>
 
                     <div className="space-y-3 border-t pt-3">

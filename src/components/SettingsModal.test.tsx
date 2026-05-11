@@ -94,7 +94,9 @@ describe('SettingsModal', () => {
             config: { apiKey: 'secret-key' },
             providerConfigs: {
                 'mock-provider-1': { apiKey: 'secret-key' }
-            }
+            },
+            stylePrompt: undefined,
+            enableRelevantPastContext: false,
         });
     });
 
@@ -130,7 +132,9 @@ describe('SettingsModal', () => {
             providerConfigs: {
                 'mock-provider-1': {},
                 'mock-provider-2': { url: 'http://localhost' }
-            }
+            },
+            stylePrompt: undefined,
+            enableRelevantPastContext: false,
         });
     });
 

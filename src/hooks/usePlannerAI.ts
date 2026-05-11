@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Message } from '../services/types';
+import type { Message, RetrievalState } from '../services/types';
 import { sendSmartMessage } from '../services/llm';
 import { buildSystemContext, getGreeting } from '../services/aiContext';
 import { allTools, executeToolCall, type PlannerActions, type ToolContext } from '../services/toolRegistry';
@@ -9,6 +9,12 @@ import { focusKey, makeMessageId, makeThreadId } from '../utils/ids';
 import { useLLMConfig } from './useLLMConfig';
 import { useChatSummarizer } from './useChatSummarizer';
 import { useRefreshSuggestions } from './useRefreshSuggestions';
+import {
+    recallRelevantSegments,
+    detectCitedSegments,
+    recordRetrievalFeedback,
+    lastUserText,
+} from '../services/multisemanticRetrieval';
 
 // Focus must persist for this many consecutive turns before thread_id rotates.
 // Prevents thread fragmentation if focus thrashes briefly within a single train of thought.
@@ -105,7 +111,18 @@ export const usePlannerAI = (
         }
 
         try {
-            const systemContext = buildSystemContext(updatedConversation, data, mode, focus);
+            const retrieved = llmConfig.enableRelevantPastContext
+                ? await recallRelevantSegments({ messages: updatedConversation, focus, data })
+                : null;
+            const retrievalState: RetrievalState | undefined = retrieved
+                ? {
+                    segmentIds: retrieved.segments.map(s => s.id),
+                    lineage: retrieved.lineage,
+                    freshness: retrieved.freshness,
+                }
+                : undefined;
+
+            const systemContext = buildSystemContext(updatedConversation, data, { mode, focus, retrieved });
             const response = await sendSmartMessage(updatedConversation, systemContext, allTools, llmConfig);
 
             const toolResults: Message[] = [];
@@ -115,6 +132,8 @@ export const usePlannerAI = (
                     toolResults.push({ role: 'user', content, id: makeMessageId('tool') });
                 }
             }
+
+            let finalAssistantContent: string;
 
             if (toolResults.length > 0) {
                 const conversationWithToolRound: Message[] = [
@@ -129,21 +148,35 @@ export const usePlannerAI = (
                 ];
 
                 const followUp = await sendSmartMessage(conversationWithToolRound, systemContext, allTools, llmConfig);
+                finalAssistantContent = response.content + (response.content ? '\n' : '') + followUp.content;
 
                 setConversation(prev => [
                     ...prev,
                     {
                         role: 'assistant',
-                        content: response.content + (response.content ? '\n' : '') + followUp.content,
+                        content: finalAssistantContent,
                         traceData: followUp.traceData,
                         id: makeMessageId('assistant'),
+                        retrievalState,
                     }
                 ]);
             } else {
+                finalAssistantContent = response.content;
                 setConversation(prev => [
                     ...prev,
-                    { role: 'assistant', content: response.content, traceData: response.traceData, id: makeMessageId('assistant') }
+                    {
+                        role: 'assistant',
+                        content: finalAssistantContent,
+                        traceData: response.traceData,
+                        id: makeMessageId('assistant'),
+                        retrievalState,
+                    }
                 ]);
+            }
+
+            if (retrieved && retrieved.segments.length > 0) {
+                const cited = detectCitedSegments(finalAssistantContent, retrieved.segments);
+                recordRetrievalFeedback(lastUserText(updatedConversation), cited);
             }
         } catch (error: unknown) {
             console.error('Error calling LLM API:', error);

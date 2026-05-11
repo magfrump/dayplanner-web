@@ -107,7 +107,7 @@ User-signaled segmentation (`/segment` command, focus-change auto-split) is defe
 
 1. **Recall stage**:
    - BM25 over `segments_fts` via SQLite FTS5, trigram tokenizer
-   - Domain lineage filter AND'd in if a focus is active (any of `valueId`, `goalId`, `projectId`, `taskId` matches)
+   - Domain lineage filter AND'd in if a focus is active — **all set lineage fields must match** the segment's corresponding field exactly. Unset filter fields are unconstrained. Null/unset on a segment never satisfies a set focus field. Stricter-not-looser is the expected evolution direction; do not pre-build an OR fallback.
    - Optional temporal filter (e.g., "last 30 days") — surfaced as a query param, not on by default
 2. **No rerank stage in MVP.** Top-K from BM25 is returned directly. Latency budget for adding rerank later is fine; the gating question is whether top-K from BM25 is good enough at this scale, which is empirically unknown.
 3. **Score-adaptive truncation** to fit context budget (existing system prompt has a budget; segment text counts against it).
@@ -385,7 +385,7 @@ Existing planner-state tests are unaffected — the segment system is additive.
 - **`thread_id` semantics:** rotate on conversation clear is the proposal. Alternatives: rotate on app restart, rotate on focus change, rotate manually. Pick after first month of use.
 - **System-prompt injection threshold:** how many segments? what BM25 score floor? Defaults to be tuned during the §6 measurement window; start at top-3 with no floor.
 - **Retrieval freshness vs. relevance tradeoff:** MVP weights pure BM25. A recency boost is straightforward to add later if old segments dominate retrieval.
-- **Lineage filter strictness:** AND vs. OR across `valueId`/`goalId`/`projectId`/`taskId`. AND is too narrow when only a top-level focus exists; OR with weighting is probably right. Pin down before §6 starts.
+- ~~**Lineage filter strictness:**~~ Resolved (Phase 3): strict AND across set lineage fields. See §3.1 and `docs/working/multisemantic-v0_3-implementation-plan.md` resolved sub-decisions.
 
 ### 10.2 Carryover risks (from v0.3)
 

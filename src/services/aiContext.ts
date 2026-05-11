@@ -2,6 +2,7 @@
 import type { Value, Goal, Project, Task, Capacity, PlannerMode, FocusState, ResolvedFocus } from '../types/planner';
 import type { Message } from './types';
 import { resolveEffectiveFocus } from '../utils/focus';
+import { formatRelevantPastContext, type RetrievalResult } from './multisemanticRetrieval';
 
 // Initial greeting based on time of day
 export const getGreeting = () => {
@@ -20,12 +21,18 @@ interface ContextData {
     stylePrompt?: string;
 }
 
+interface BuildSystemContextOptions {
+    mode?: PlannerMode;
+    focus?: FocusState;
+    retrieved?: RetrievalResult | null;
+}
+
 export const buildSystemContext = (
     currentConversation: Message[],
     data: ContextData,
-    mode: PlannerMode = 'focusing',
-    focus?: FocusState
+    opts: BuildSystemContextOptions = {},
 ) => {
+    const { mode = 'focusing', focus, retrieved } = opts;
     const { values, goals, projects, capacity } = data;
 
     const { focusedValue, focusedGoal, focusedProject, focusedTask } = resolveEffectiveFocus(focus, currentConversation, data);
@@ -44,10 +51,6 @@ export const buildSystemContext = (
         if (t) res += `      - TASK: ${t.name}${t.description ? ` (${t.description})` : ''}\n`;
         return res;
     };
-
-    // --- FILTERING LOGIC MOVED TO getVisibleContextData ---
-
-
 
     const valuesList = visibleValues.map(v =>
         v.id === focusedValue?.id ? `- ${v.name} (id: ${v.id}) [IN FOCUS]` : `- ${v.name} (id: ${v.id})`
@@ -75,13 +78,15 @@ export const buildSystemContext = (
     }).join('\n');
 
     let lineageHeader = "";
-
     if (focusedValue || focusedGoal || focusedProject || focusedTask) {
         lineageHeader = `\n${formatLineage(focusedValue, focusedGoal, focusedProject, focusedTask)}\n`;
     }
 
+    const retrievalHeader = formatRelevantPastContext(retrieved ?? null);
+
     return `You are a personal day planning assistant helping the user navigate their day thoughtfully.
 ${lineageHeader}
+${retrievalHeader}
 ${docsHeader}
 Current Context:
 VALUES:

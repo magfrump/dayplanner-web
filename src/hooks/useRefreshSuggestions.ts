@@ -77,7 +77,7 @@ export const useRefreshSuggestions = ({
                 toolRegistry.read_project_documents.definition
             ];
 
-            const systemContext = buildSystemContext(conversation, data, mode);
+            const systemContext = buildSystemContext(conversation, data, { mode });
             const promptMessages: Message[] = [
                 {
                     role: 'user', content: `Analyze the user's planner data and suggest a "Daily Refresh".
