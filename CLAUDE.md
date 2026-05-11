@@ -65,6 +65,14 @@ Manual trigger: the Archive button in the header calls `summarizeConversation(tr
 
 Vitest with jsdom. Component tests use `@testing-library/react`. Storage-server tests use `supertest` against the exported Express `app`. Tests are colocated next to source (`*.test.ts(x)`), with a few integration-style tests for the storage server living at the repo root (`storage-server.test.js`, `storage-patch.test.js`, `concurrency.test.js`, `restore-data.test.js`).
 
+## Multisemantic segment store
+
+- SQLite-backed segment store lives in `data/multisemantic.sqlite` (gitignored). Schema and helpers in `multisemantic-db.js`; segment write hook fires from `useChatSummarizer` after `/api/log/archive`. Spec: `docs/multisemantic_v0_3_dayplanner.md`. UI substrate decision: `docs/decisions/001-multisemantic-ui-substrate.md`.
+- Cold-start importer: `node scripts/import_archives.js`. Re-run any time; idempotent on segment id. Use to seed the segments table from `logs/chat_archive_*.jsonl` after `multisemantic.sqlite` is lost or first set up.
+- Rebuild from scratch: `rm data/multisemantic.sqlite data/multisemantic.sqlite.last-good && node scripts/import_archives.js`. Lineage placements are not recoverable from archives — they remain empty until the (fast-follow) lineage-repair wizard ships.
+- `thread_id` rotates when active focus changes for ≥2 consecutive turns (debounce in `usePlannerAI`).
+- Strict-AND lineage filter is the focus-mode default — stricter filters are the expected evolution direction, not looser ones.
+
 ## Working notes
 
 - `@typescript-eslint/no-explicit-any` is intentionally tolerant for now (rapid prototype). Don't introduce new `any`s in production paths, but don't waste a session chasing existing ones.

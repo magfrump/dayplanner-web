@@ -113,7 +113,7 @@ export function extractTranscriptText(messages) {
 }
 
 const INSERT_SEGMENT_SQL = `
-INSERT INTO segments (
+INSERT OR IGNORE INTO segments (
   id, thread_id, created_at, updated_at,
   transcript_json, transcript_text, summary,
   value_id, goal_id, project_id, task_id,
@@ -126,6 +126,9 @@ INSERT INTO segments (
 )
 `;
 
+// Returns { segment, inserted }. `inserted` is false when a row with this id already
+// existed (INSERT OR IGNORE skipped the write); callers can use this to count
+// idempotent re-runs during cold-start import.
 export function insertSegment(db, segment) {
     const now = new Date().toISOString();
     const lineage = segment.lineage || {};
@@ -133,7 +136,7 @@ export function insertSegment(db, segment) {
     const transcriptJson = JSON.stringify(segment.transcript || []);
     const transcriptText = extractTranscriptText(segment.transcript);
 
-    db.prepare(INSERT_SEGMENT_SQL).run({
+    const result = db.prepare(INSERT_SEGMENT_SQL).run({
         id: segment.id,
         thread_id: segment.thread_id,
         created_at: segment.created_at || now,
@@ -150,7 +153,10 @@ export function insertSegment(db, segment) {
         archive_file: metadata.archive_file,
     });
 
-    return getSegment(db, segment.id);
+    return {
+        segment: getSegment(db, segment.id),
+        inserted: result.changes > 0,
+    };
 }
 
 export function getSegment(db, id) {

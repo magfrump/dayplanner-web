@@ -7,7 +7,6 @@ import {
     openDatabase,
     snapshotIfStale,
     insertSegment,
-    getSegment,
     searchSegments,
     countSegmentsByLineage,
 } from './multisemantic-db.js';
@@ -306,18 +305,15 @@ app.post('/api/segments', async (req, res) => {
                 res.status(400).json({ error: 'Missing required fields: id, thread_id, metadata.archive_file' });
                 return;
             }
-            const existing = getSegment(segmentDb, segment.id);
-            if (existing) {
-                res.json({ success: true, segment: existing, duplicate: true });
-                return;
+            const { segment: stored, inserted } = insertSegment(segmentDb, segment);
+            if (inserted) {
+                try {
+                    await snapshotIfStale(DATA_DIR);
+                } catch (e) {
+                    console.error('Snapshot-after-insert failed:', e);
+                }
             }
-            const inserted = insertSegment(segmentDb, segment);
-            try {
-                await snapshotIfStale(DATA_DIR);
-            } catch (e) {
-                console.error('Snapshot-after-insert failed:', e);
-            }
-            res.json({ success: true, segment: inserted });
+            res.json({ success: true, segment: stored, duplicate: !inserted });
         });
     } catch (error) {
         console.error('Segment insert error:', error);
