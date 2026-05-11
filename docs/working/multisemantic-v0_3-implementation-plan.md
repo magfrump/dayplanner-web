@@ -1,23 +1,31 @@
 **Goal**: Implement the multisemantic v0.3 MVP scope (`docs/multisemantic_v0_3_dayplanner.md` §8) using the UI substrate chosen in `docs/decisions/001-multisemantic-ui-substrate.md`.
-**Project state**: Phases 0–2 shipped on `dev` (commits `f193840`, `2a72dc2`, `1615e95`, plus post-review simplification `907566f`). Phase 3 next.
-**Task status**: Phases 0–2 complete; Phase 3 ready to start. Plan edits below reflect what actually shipped and adjust Phases 3–5 accordingly.
+**Project state**: Phases 0–3 shipped on `dev`. Phase 4 next.
+**Task status**: Phases 0–3 complete; Phase 4 ready to start. Plan edits below reflect what actually shipped and adjust Phases 4–5 accordingly.
 
-## What shipped in Phases 0–2 (vs. plan)
+## What shipped in Phases 0–3 (vs. plan)
 
 Cross-cutting facts the later phases should treat as established:
 
-- **`LINEAGE_LEVELS` constant** (`multisemantic-db.js:12`) is the single source of truth for `(column, payload-key)` pairs. Phases 3+ import it — do not redefine the four levels anywhere else.
+- **`LINEAGE_LEVELS` constant** (`multisemantic-db.js:12`) is the single source of truth on the server side. On the client, **`LINEAGE_KEYS`** (`src/services/lineageKeys.ts:4`) is the TS twin used by retrieval, the tool handler, and any future Phase 4 client that iterates lineage fields. Keep both in sync if the list ever changes; do not redefine the four levels anywhere else.
 - **Schema additions beyond spec**: `transcript_text` is a denormalized FTS-friendly column (not `json_extract`); `deleted_at` already exists on `segments`. Phase 4 merge/split therefore needs **no migration**.
 - **FTS5 escaping** (`escapeFtsQuery` in `multisemantic-db.js:249`) wraps each whitespace-delimited token as a quoted phrase, so arbitrary user/LLM text (identifiers, punctuation, ∀) flows safely through `recall_segments`. Don't re-implement.
-- **`focusKey()` helper** (`utils/ids.ts:31`) produces a stable string from a `ResolvedFocus`. Phase 1 uses it for thread rotation; Phase 3 should reuse it for per-turn injection dedupe.
-- **Segment POST is fire-and-forget** (`useChatSummarizer.ts:73`): `fetch(...).catch(console.error)`, never awaited. Failure does not block the user-visible summarization flow. Phase 3's `retrieval_feedback` POST adopts the same pattern.
+- **`focusKey()` helper** (`utils/ids.ts:31`) produces a stable string from a `ResolvedFocus`. Used by Phase 1 for thread rotation. Phase 3 did NOT end up using it: a retrieval-result cache was attempted but unreachable (every send appends a new user message → key always changes) and was removed during the post-review simplification.
+- **`lineageFromResolved()` helper** (`src/utils/focus.ts`) — single producer of `SegmentLineage` from a `ResolvedFocus`. Consumed by `useChatSummarizer` (segment write) AND `multisemanticRetrieval` (search query). Reuse in Phase 4 anywhere lineage is built from focus.
+- **Segment POST is fire-and-forget** (`useChatSummarizer.ts:73`): `fetch(...).catch(console.error)`, never awaited. `retrieval_feedback` POST adopts the same pattern (`multisemanticRetrieval.ts:recordRetrievalFeedback`). Phase 4 merge/split POSTs should follow the same rule.
 - **`insertSegment` returns `{segment, inserted}`** (`multisemantic-db.js:150`) and uses `INSERT OR IGNORE`. Phase 4 merge/split endpoints should mirror this contract.
-- **Endpoints already live**: `POST /api/segments`, `GET /api/segments/search`, `GET /api/segments/counts` (signature: `?level=X&ids=a,b,c`). Phase 4's `useSegmentCounts` consumes the counts endpoint as-is.
-- **Empirical corpus today: 0 segments**. No `logs/chat_archive_*.jsonl` exist yet, so the cold-start importer ran with no input. Phase 3 retrievals will return empty for some period after toggle-flip until organic summarizations accumulate. This shapes Phase 5 measurement timing — see Phase 5 caveat below.
+- **`buildSystemContext` signature** (`src/services/aiContext.ts`) is now `(conversation, data, { mode?, focus?, retrieved? })` — an options object, not positional. Phase 4 has no direct interaction with this, but any tests that touch it should use the options form.
+- **`Message.retrievalState`** (`src/services/types.ts`) carries `{segmentIds, lineage, freshness}` and is stashed on assistant turns post-injection. **Phase 4's `LineageBreadcrumb` reads from here, not LLM self-report.** This is the H7' load-bearing wire (decision 001 consequences §4). It is `undefined` when retrieval didn't fire or returned nothing — render accordingly.
+- **Endpoints already live**: `POST /api/segments`, `GET /api/segments/search`, `GET /api/segments/counts` (signature: `?level=X&ids=a,b,c`), `POST /api/retrieval_feedback` (body: `{query, segment_ids, helpful}`). Phase 4's `useSegmentCounts` consumes the counts endpoint as-is.
+- **`recall_segments` tool** (`src/services/toolRegistry.ts`) returns summaries-only by default; pass `includeTranscript: true` to attach transcripts. The API itself always returns full segments — the tool reshapes the LLM-facing payload.
+- **`enableRelevantPastContext` toggle** lives on `LLMConfig` (persisted via `useLLMConfig` localStorage) and is exposed in `SettingsModal`. Default **off**; flip on for §6 measurement after the decision doc lands (Phase 5).
+- **Top-K is hardcoded to 3** (`multisemanticRetrieval.ts:TOP_K`) for system-prompt injection — matches spec §10.1 default. `recall_segments` tool calls accept their own `limit` (default 10).
+- **Citation heuristic** (`detectCitedSegments` in `multisemanticRetrieval.ts`) — literal segment-id mention OR ≥20-char substring of segment transcript appearing in assistant text. Iterates 20-char windows of (typically shorter) assistant text. `recordRetrievalFeedback` is fire-and-forget after every retrieval-augmented assistant turn.
+- **Empirical corpus today: 0 segments**. No `logs/chat_archive_*.jsonl` exist yet, so the cold-start importer ran with no input. With Phase 3 shipped but the toggle defaulting off, retrieval still does not fire in normal use. Phase 5 measurement timing must account for both the toggle-flip date AND the segment accumulation curve — see Phase 5 caveat below.
 - **§9 tests already shipped** (move out of later-phase test lists):
   - Phase 0: `fts-finds-newly-written-segment`, `fts-tokenizer-handles-identifiers`, `lineage-filter-returns-only-matching-segments`.
   - Phase 1: `summarization-produces-segment-with-lineage-from-focus-state`, `archive-write-precedes-segment-insert`.
   - Phase 2: `cold-start-import-is-idempotent`.
+  - Phase 3: `recall_segments` tool roundtrip (summaries default + transcript opt-in + lineage filter passthrough), `buildSystemContext` injection on/off, retrieval lineage-filter query construction, `Message.retrievalState` stash, citation-heuristic feedback POST, `/api/retrieval_feedback` insert + reject.
 
 ---
 
@@ -93,26 +101,21 @@ Goal: existing `logs/chat_archive_*.jsonl` corpus indexed.
 
 **Gate**: importer succeeds against real archives; rerunning is a no-op.
 
-## Phase 3 — Retrieval surfaces (closes spec §3.1, §3.6, §8.5-6)
+## Phase 3 — Retrieval surfaces (closes spec §3.1, §3.6, §8.5-6) — **SHIPPED**
 
 Goal: LLM has access to past segments via tool + optional system-prompt injection.
 
-1. **Register `recall_segments`** in `src/services/toolRegistry.ts`. Inputs: `query` (string), optional `lineageFilter` (subset of `{valueId, goalId, projectId, taskId}`), optional `limit` (default 10), optional `includeTranscript` (default `false`). Handler fetches from `/api/segments/search`.
-   - **Default output is summaries only**: `{id, thread_id, summary, lineage, created_at, archive_file}`. Full transcripts inflate the LLM context budget and are rarely needed turn-over-turn.
-   - When `includeTranscript: true`, attach `transcript` to each result. This is the path for "I want to read the whole thing" follow-up calls.
-2. **System-prompt injection** in `aiContext.buildSystemContext`: behind a config toggle (`enableRelevantPastContext`, default off in production until §6.5 baseline run completes), call the search endpoint with the resolved focus lineage and the last user turn as query. Inject top-3 summaries under `RELEVANT PAST CONTEXT:`. Default no BM25 floor (per §10.1). Use `focusKey()` from `utils/ids.ts` to detect "focus unchanged since last injection" and skip recomputing on rapid turns.
-   - **Lineage filter is strict AND in focus mode**: every set lineage field on the focus state must match the segment's corresponding field exactly (null/unset on the segment never satisfies a set focus field). Already shipped in `multisemantic-db.js:230`. Per user direction, the expected evolution is *stricter* filters (e.g., recency cutoffs, exact-tag match), not looser; do not pre-build an OR fallback.
-   - **Spec wording update is a sub-task**: `docs/multisemantic_v0_3_dayplanner.md` §3.1 currently says "any of valueId/goalId/projectId/taskId matches." Replace with "all set lineage fields must match." `CLAUDE.md` already documents this; the spec itself is stale.
-3. **Record injection state**: when a system prompt includes retrieved segments, stash the `{segmentIds, lineage, freshness}` tuple on the assistant turn it precedes. This is what the breadcrumb (Phase 4) reads. **Critical**: pulled from system-side record, not LLM self-report — this is the H7' load-bearing wire (decision 001 consequences §4).
-4. **Auto-populate `retrieval_feedback`** (fire-and-forget, mirroring `useChatSummarizer.ts:73`): when an assistant turn references an injected `segmentId` (literal id OR quoted ≥20-char substring of segment transcript), POST a `helpful=1` row. Cheap heuristic; deferred explicit thumbs. `fetch(...).catch(console.error)` — never await.
-5. Tests:
-   - `recall_segments` tool roundtrip (mocked LLM, asserts summaries-only by default and transcripts when flag set).
-   - Snapshot test on `buildSystemContext` with toggle on/off.
-   - Injection-state roundtrip: assistant turn carries `{segmentIds, lineage, freshness}` after a retrieval-augmented send.
-   - `retrieval_feedback` heuristic: assistant turn quoting a ≥20-char substring of an injected segment produces a `helpful=1` row.
-   - (Note: `lineage-filter-returns-only-matching-segments` and `fts-tokenizer-handles-identifiers` already covered by Phase 0 tests — don't duplicate.)
+**Deltas worth carrying forward**:
 
-**Gate**: toggle on → assistant turns are visibly conditioned on past context in dev; toggle off → §6.5 baseline behavior unchanged. Spec §3.1 wording updated in the same PR.
+- **`recall_segments` tool** ships with the planned shape: query + optional `lineageFilter` + `limit` (default 10) + `includeTranscript` (default false). Server response is always full segments; the tool reshapes for the LLM.
+- **`focusKey`-based per-turn dedupe was attempted and removed.** A retrieval-result cache keyed on `(focusKey, lastUserText)` was introduced and then deleted during simplification — every `sendMessage` appends a new user message, so the key always differs and the cache never hit. Phase 4+ should not try to revive this without first identifying a real recurrence pattern.
+- **Lineage filter strict-AND** is the focus-mode default (already shipped in `multisemantic-db.js:230`). Spec §3.1 wording updated in the same PR; §10.1 open question marked resolved. Stricter-not-looser remains the expected evolution direction.
+- **Citation heuristic** lives client-side in `multisemanticRetrieval.ts:detectCitedSegments`. Iterates 20-char windows of the (typically shorter) assistant text against transcript text via `String.includes`. Single POST per turn batches all cited segment ids.
+- **`enableRelevantPastContext` toggle** is on `LLMConfig` (persisted to localStorage via `useLLMConfig`), default off, exposed in `SettingsModal`. Phase 5 measurement window must not start until this is flipped on.
+- **Three new files**: `src/services/multisemanticRetrieval.ts` (recall + cite + feedback helpers), `src/services/lineageKeys.ts` (TS twin of `LINEAGE_LEVELS`), and `lineageFromResolved` exported from `src/utils/focus.ts` (replaces inline literal in `useChatSummarizer`).
+- **`buildSystemContext` signature changed** to options object: `(conversation, data, { mode?, focus?, retrieved? })`. Two existing call sites (`usePlannerAI`, `useRefreshSuggestions`) and 7 test cases were updated.
+
+**Gate met**: toggle on → assistant turns conditioned on past context in dev; toggle off → §6.5 baseline behavior unchanged. Spec §3.1 wording updated in the same PR.
 
 ## Phase 4 — UI substrate (closes spec §3.5; decision 001 MVP)
 
@@ -154,7 +157,7 @@ Goal: pre-registered decision rule recorded; data flows to measure it.
 
 - **Concurrency**: SQLite writes from the Express server go through the existing per-key lock pattern — use a single lock key `"multisemantic"` (don't try per-segment locking; `better-sqlite3` is synchronous, lock is enough). Already wired in `/api/segments` POST.
 - **Recovery**: if `multisemantic.sqlite` is destroyed, spec §7 says rebuild via cold-start importer (lossy on lineage and feedback). Documented in `CLAUDE.md` (`node scripts/import_archives.js`).
-- **Reuse the `LINEAGE_LEVELS` constant** (`multisemantic-db.js:12`) anywhere lineage fields are iterated. Phase 3's tool input validator and Phase 4's `useSegmentCounts` are the obvious candidates.
+- **Reuse the lineage constants** anywhere lineage fields are iterated: `LINEAGE_LEVELS` (`multisemantic-db.js:12`) on the server, `LINEAGE_KEYS` (`src/services/lineageKeys.ts`) on the client. Phase 4's `useSegmentCounts` should consume the client constant.
 - **Feature-flag debt**: the `enableRelevantPastContext` toggle is the spec §10.2 carryover. After §6 measurement completes, either remove the toggle or remove the injection path entirely.
 - **Linting**: stick with the existing `no-explicit-any` tolerance; don't introduce new `any` in segment code.
 
@@ -165,7 +168,7 @@ Phases are written in dependency order. Actual commit cadence so far:
 - Phase 0 shipped standalone (`f193840`). Reversible: drop SQLite file.
 - Phase 1 shipped standalone (`2a72dc2`). Reversible: revert; segments table accumulates orphans harmlessly.
 - Phase 2 shipped standalone (`1615e95`), plus a three-agent review pass (`907566f`) and a tsc-build fixture fix (`8b08f2b`).
-- Phase 3 — one PR. Reversible behind toggle (`enableRelevantPastContext` default off).
+- Phase 3 shipped as one feat commit + plan revision. Reversible behind toggle (`enableRelevantPastContext` default off); reverting drops the new files but the `Message.retrievalState` field is additive and harmless if left in `services/types.ts`.
 - Phase 4 — one PR, split if the custom-node introduction grows large.
 - Phase 5 — one PR (decision doc + snapshot endpoint).
 
@@ -174,8 +177,9 @@ Each PR ends with the `pr-prep.md` workflow including the review-fix loop.
 ## Resolved sub-decisions
 
 1. **`thread_id` rotation policy**: rotate on focus change (Phase 1 step 2). Watch for thread fragmentation and any latency on focus change. Debounce so a focus must persist ≥2 turns before rotating.
-2. **Lineage filter strictness**: full AND in focus mode (Phase 3 step 2). Spec §3.1 wording must be updated when Phase 3 lands. Stricter-not-looser is the expected evolution direction.
+2. **Lineage filter strictness**: full AND in focus mode (Phase 3, shipped). Spec §3.1 wording updated. Stricter-not-looser is the expected evolution direction.
 3. **`multisemantic.sqlite.last-good` cadence**: daily minimum plus on startup, via a lazy mtime check at segment-insert time (Phase 0 step 3).
+4. **Per-turn retrieval cache**: not needed. Attempted in Phase 3 implementation, removed during simplification — the `(focusKey, lastUserText)` key changes every turn so the cache was unreachable. Each retrieval-augmented send re-issues the FTS query.
 
 ## Open questions remaining
 
