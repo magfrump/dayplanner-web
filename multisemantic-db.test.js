@@ -274,5 +274,81 @@ describe('Multisemantic segment store', () => {
             const r = await request(app).post('/api/retrieval_feedback').send({ query: 'x' });
             expect(r.status).toBe(400);
         });
+
+        it('accepts {cited_ids, uncited_ids} and writes both helpful=1 and helpful=0 rows', async () => {
+            const r = await request(app).post('/api/retrieval_feedback').send({
+                query: 'training plan',
+                cited_ids: ['seg-fb-1'],
+                uncited_ids: ['seg-fb-2'],
+            });
+            expect(r.status).toBe(200);
+            expect(r.body.inserted).toBe(2);
+
+            const snap = await request(app).get('/api/segments/eval-snapshot');
+            expect(snap.body.segmentsRetrieved).toBe(2);
+            expect(snap.body.segmentsCited).toBe(1);
+            expect(snap.body.retrievalEvents).toBe(1);
+            expect(snap.body.citedRetrievals).toBe(1);
+        });
+
+        it('rejects new-shape requests with both arrays empty', async () => {
+            const r = await request(app).post('/api/retrieval_feedback').send({
+                query: 'x',
+                cited_ids: [],
+                uncited_ids: [],
+            });
+            expect(r.status).toBe(400);
+        });
+    });
+
+    describe('/api/segments/eval-snapshot', () => {
+        beforeEach(async () => {
+            await request(app).post('/api/segments').send(makeSegment({ id: 'seg-s-1' })).expect(200);
+            await request(app).post('/api/segments').send(makeSegment({ id: 'seg-s-2' })).expect(200);
+            await request(app).post('/api/segments').send(makeSegment({ id: 'seg-s-3' })).expect(200);
+        });
+
+        it('returns zeros over an empty corpus', async () => {
+            const r = await request(app).get('/api/segments/eval-snapshot');
+            expect(r.status).toBe(200);
+            expect(r.body).toMatchObject({
+                retrievalEvents: 0,
+                citedRetrievals: 0,
+                citeRate: 0,
+                segmentsRetrieved: 0,
+                segmentsCited: 0,
+            });
+        });
+
+        it('counts retrieval events and cite rate across multiple turns', async () => {
+            // Turn 1: cite 1 of 2 → event counts as cited.
+            await request(app).post('/api/retrieval_feedback').send({
+                query: 'q1', cited_ids: ['seg-s-1'], uncited_ids: ['seg-s-2'],
+            }).expect(200);
+            // Turn 2: cite 0 of 2 → event counts as uncited.
+            await request(app).post('/api/retrieval_feedback').send({
+                query: 'q2', cited_ids: [], uncited_ids: ['seg-s-1', 'seg-s-3'],
+            }).expect(200);
+
+            const r = await request(app).get('/api/segments/eval-snapshot');
+            expect(r.body.retrievalEvents).toBe(2);
+            expect(r.body.citedRetrievals).toBe(1);
+            expect(r.body.citeRate).toBe(0.5);
+            expect(r.body.segmentsRetrieved).toBe(4);
+            expect(r.body.segmentsCited).toBe(1);
+        });
+
+        it('filters by since/until window', async () => {
+            await request(app).post('/api/retrieval_feedback').send({
+                query: 'q-old', cited_ids: ['seg-s-1'], uncited_ids: [],
+            }).expect(200);
+
+            // Use a future `since` so the just-written row falls outside the window.
+            const future = new Date(Date.now() + 60_000).toISOString();
+            const r = await request(app).get(`/api/segments/eval-snapshot?since=${encodeURIComponent(future)}`);
+            expect(r.body.retrievalEvents).toBe(0);
+            expect(r.body.segmentsRetrieved).toBe(0);
+            expect(r.body.since).toBe(future);
+        });
     });
 });

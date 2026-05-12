@@ -134,14 +134,18 @@ export const detectCitedSegments = (
     return cited;
 };
 
+// Cited + uncited are sent together so the server records one retrieval event
+// (one shared retrieved_at). Splitting across two POSTs would double-count the
+// §6.3 denominator.
 export const recordRetrievalFeedback = (
     query: string,
-    segmentIds: string[],
+    citedIds: string[],
+    uncitedIds: string[] = [],
 ): void => {
-    if (segmentIds.length === 0) return;
+    if (citedIds.length === 0 && uncitedIds.length === 0) return;
     fetch('/api/retrieval_feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, segment_ids: segmentIds, helpful: 1 }),
+        body: JSON.stringify({ query, cited_ids: citedIds, uncited_ids: uncitedIds }),
     }).catch(e => console.error('retrieval_feedback POST failed:', e));
 };

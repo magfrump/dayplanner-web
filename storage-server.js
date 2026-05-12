@@ -10,8 +10,10 @@ import {
     searchSegments,
     countSegmentsByLineage,
     recordRetrievalFeedback,
+    recordRetrievalEvent,
     mergeSegments,
     splitSegment,
+    getEvalSnapshot,
     LINEAGE_LEVELS,
 } from './multisemantic-db.js';
 
@@ -352,7 +354,21 @@ app.get('/api/segments/search', async (req, res) => {
 app.post('/api/retrieval_feedback', async (req, res) => {
     try {
         await acquireLock(MULTISEMANTIC_LOCK_KEY, async () => {
-            const { query, segment_ids, helpful, contributing_indexes } = req.body || {};
+            const { query, segment_ids, helpful, contributing_indexes, cited_ids, uncited_ids } = req.body || {};
+            const contributingIndexes = Array.isArray(contributing_indexes) ? contributing_indexes : undefined;
+
+            if (Array.isArray(cited_ids) || Array.isArray(uncited_ids)) {
+                const citedIds = Array.isArray(cited_ids) ? cited_ids : [];
+                const uncitedIds = Array.isArray(uncited_ids) ? uncited_ids : [];
+                if (citedIds.length === 0 && uncitedIds.length === 0) {
+                    res.status(400).json({ error: 'cited_ids and uncited_ids cannot both be empty' });
+                    return;
+                }
+                const result = recordRetrievalEvent(segmentDb, { query, citedIds, uncitedIds, contributingIndexes });
+                res.json({ success: true, inserted: result.inserted });
+                return;
+            }
+
             if (!Array.isArray(segment_ids) || segment_ids.length === 0) {
                 res.status(400).json({ error: 'segment_ids must be a non-empty array' });
                 return;
@@ -361,7 +377,7 @@ app.post('/api/retrieval_feedback', async (req, res) => {
                 query,
                 segmentIds: segment_ids,
                 helpful: helpful == null ? 1 : Number(helpful),
-                contributingIndexes: Array.isArray(contributing_indexes) ? contributing_indexes : undefined,
+                contributingIndexes,
             });
             res.json({ success: true, inserted: result.inserted });
         });
@@ -434,6 +450,23 @@ app.get('/api/segments/counts', async (req, res) => {
         res.json({ counts });
     } catch (error) {
         console.error('Segment counts error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Ad-hoc snapshot of the §6 retrieval-evaluation counters. The decision rule lives
+// in docs/decisions/002-multisemantic-retrieval-eval.md; this endpoint surfaces the
+// numbers that rule consumes without requiring direct SQL access.
+app.get('/api/segments/eval-snapshot', async (req, res) => {
+    try {
+        const { since, until } = req.query;
+        const snapshot = getEvalSnapshot(segmentDb, {
+            since: typeof since === 'string' ? since : undefined,
+            until: typeof until === 'string' ? until : undefined,
+        });
+        res.json(snapshot);
+    } catch (error) {
+        console.error('Eval snapshot error:', error);
         res.status(500).json({ error: error.message });
     }
 });

@@ -162,7 +162,7 @@ describe('usePlannerAI Phase 3 retrieval', () => {
         expect(assistantMsg?.retrievalState).toBeUndefined();
     });
 
-    it('posts helpful=1 to /api/retrieval_feedback when assistant quotes a ≥20-char substring of an injected segment', async () => {
+    it('posts cited_ids to /api/retrieval_feedback when assistant quotes a ≥20-char substring of an injected segment', async () => {
         // The transcript on the injected segment contains "running shoes from the store on Main Street"
         // — we make the assistant reply quote a 30-char window from it.
         vi.mocked(llmService.sendSmartMessage).mockResolvedValue({
@@ -179,13 +179,13 @@ describe('usePlannerAI Phase 3 retrieval', () => {
         await waitFor(() => {
             const fbCall = fetchCalls.find(c => c.url === '/api/retrieval_feedback');
             expect(fbCall).toBeDefined();
-            const body = fbCall!.body as { segment_ids: string[]; helpful: number };
-            expect(body.segment_ids).toContain('seg-PHASE3-A');
-            expect(body.helpful).toBe(1);
+            const body = fbCall!.body as { cited_ids: string[]; uncited_ids: string[] };
+            expect(body.cited_ids).toContain('seg-PHASE3-A');
+            expect(body.uncited_ids).toEqual([]);
         });
     });
 
-    it('does not post retrieval_feedback when assistant turn cites nothing from the injection', async () => {
+    it('posts the retrieved segment as uncited when assistant cites nothing — needed for the §6 implicit-negative signal', async () => {
         vi.mocked(llmService.sendSmartMessage).mockResolvedValue({
             content: 'Sure, let me help you plan.',
             toolCalls: [],
@@ -197,7 +197,12 @@ describe('usePlannerAI Phase 3 retrieval', () => {
 
         await act(async () => { await result.current.sendMessage('Anything new on training plan?'); });
 
-        const fbCall = fetchCalls.find(c => c.url === '/api/retrieval_feedback');
-        expect(fbCall).toBeUndefined();
+        await waitFor(() => {
+            const fbCall = fetchCalls.find(c => c.url === '/api/retrieval_feedback');
+            expect(fbCall).toBeDefined();
+            const body = fbCall!.body as { cited_ids: string[]; uncited_ids: string[] };
+            expect(body.cited_ids).toEqual([]);
+            expect(body.uncited_ids).toContain('seg-PHASE3-A');
+        });
     });
 });

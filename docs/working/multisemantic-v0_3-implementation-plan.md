@@ -1,8 +1,8 @@
 **Goal**: Implement the multisemantic v0.3 MVP scope (`docs/multisemantic_v0_3_dayplanner.md` §8) using the UI substrate chosen in `docs/decisions/001-multisemantic-ui-substrate.md`.
-**Project state**: Phases 0–4 shipped on `dev`. Phase 5 next.
-**Task status**: Phases 0–4 complete; Phase 5 ready to start. Plan edits below reflect what actually shipped and adjust Phase 5 accordingly.
+**Project state**: Phases 0–5 shipped on `dev`. MVP complete; fast-follows (lineage-repair wizard, open-loop tray, archive view, review mode) remain available pending need.
+**Task status**: All five phases complete. Plan edits below reflect what actually shipped.
 
-## What shipped in Phases 0–4 (vs. plan)
+## What shipped in Phases 0–5 (vs. plan)
 
 Cross-cutting facts the later phases should treat as established:
 
@@ -15,18 +15,20 @@ Cross-cutting facts the later phases should treat as established:
 - **`insertSegment` returns `{segment, inserted}`** (`multisemantic-db.js:150`) and uses `INSERT OR IGNORE`. Phase 4 merge/split endpoints should mirror this contract.
 - **`buildSystemContext` signature** (`src/services/aiContext.ts`) is now `(conversation, data, { mode?, focus?, retrieved? })` — an options object, not positional. Phase 4 has no direct interaction with this, but any tests that touch it should use the options form.
 - **`Message.retrievalState`** (`src/services/types.ts`) carries `{segmentIds, lineage, freshness}` and is stashed on assistant turns post-injection. **Phase 4's `LineageBreadcrumb` reads from here, not LLM self-report.** This is the H7' load-bearing wire (decision 001 consequences §4). It is `undefined` when retrieval didn't fire or returned nothing — render accordingly.
-- **Endpoints already live**: `POST /api/segments`, `GET /api/segments/search`, `GET /api/segments/counts` (signature: `?level=X&ids=a,b,c`), `POST /api/retrieval_feedback` (body: `{query, segment_ids, helpful}`). Phase 4's `useSegmentCounts` consumes the counts endpoint as-is.
+- **Endpoints already live**: `POST /api/segments`, `GET /api/segments/search`, `GET /api/segments/counts` (signature: `?level=X&ids=a,b,c`), `POST /api/retrieval_feedback` (preferred body: `{query, cited_ids, uncited_ids}`; legacy `{query, segment_ids, helpful}` still works), `POST /api/segments/merge`, `POST /api/segments/split`, `GET /api/segments/eval-snapshot?since=&until=`. Phase 4's `useSegmentCounts` consumes the counts endpoint as-is.
 - **`recall_segments` tool** (`src/services/toolRegistry.ts`) returns summaries-only by default; pass `includeTranscript: true` to attach transcripts. The API itself always returns full segments — the tool reshapes the LLM-facing payload.
-- **`enableRelevantPastContext` toggle** lives on `LLMConfig` (persisted via `useLLMConfig` localStorage) and is exposed in `SettingsModal`. Default **off**; flip on for §6 measurement after the decision doc lands (Phase 5).
+- **`enableRelevantPastContext` toggle** lives on `LLMConfig` (persisted via `useLLMConfig` localStorage) and is exposed in `SettingsModal`. Default **off**. Decision doc 002 has shipped; the toggle is now gated on the corpus-size trigger in that doc's §Window (≥30 segments with non-empty lineage OR lineage-repair wizard) rather than on the doc itself.
 - **Top-K is hardcoded to 3** (`multisemanticRetrieval.ts:TOP_K`) for system-prompt injection — matches spec §10.1 default. `recall_segments` tool calls accept their own `limit` (default 10).
-- **Citation heuristic** (`detectCitedSegments` in `multisemanticRetrieval.ts`) — literal segment-id mention OR ≥20-char substring of segment transcript appearing in assistant text. Iterates 20-char windows of (typically shorter) assistant text. `recordRetrievalFeedback` is fire-and-forget after every retrieval-augmented assistant turn.
-- **Empirical corpus today: 0 segments**. No `logs/chat_archive_*.jsonl` exist yet, so the cold-start importer ran with no input. With Phase 3 shipped but the toggle defaulting off, retrieval still does not fire in normal use. Phase 5 measurement timing must account for both the toggle-flip date AND the segment accumulation curve — see Phase 5 caveat below.
+- **Citation heuristic** (`detectCitedSegments` in `multisemanticRetrieval.ts`) — literal segment-id mention OR ≥20-char substring of segment transcript appearing in assistant text. Iterates 20-char windows of (typically shorter) assistant text. Post-Phase-5, `recordRetrievalFeedback` is fire-and-forget on **every** retrieval-augmented turn (not just turns with citations) — the uncited segments are recorded with `helpful=0` so the §6.3 denominator is honest.
+- **Empirical corpus today: 0 segments**. No `logs/chat_archive_*.jsonl` exist yet, so the cold-start importer ran with no input. With the toggle still defaulting off, retrieval does not fire in normal use; the snapshot endpoint correctly returns zeros. Window-opening criteria are pre-registered in `docs/decisions/002-multisemantic-retrieval-eval.md` §Window — the `Window opened: <unset>` line is the trigger to flip on.
 - **`buildSearchUrl` is the canonical FTS URL builder** (`src/services/multisemanticRetrieval.ts`). Exported during Phase 4's /simplify pass so three call sites converge: retrieval-injection (`recallRelevantSegments`), the `recall_segments` tool, and `SegmentPopover`. Any future search-fronting UI should call it rather than rebuilding the query string.
 - **`makeSegmentId` is the canonical server-side segment id generator** (`multisemantic-db.js`): `seg-${randomUUID()}`. Used by `mergeSegments`, `splitSegment`, and `scripts/import_archives.js`. Don't reinline `seg-${randomUUID()}` anywhere.
 - **Custom-node factoring**: a single `BaseNode` (`src/components/Planner/nodes/BaseNode.tsx`) with a `showBadge` prop drives all four lineage levels. `GraphView.tsx`'s module-scope `nodeTypes` map registers four inline arrow components — adding a node type (or moving badges to Value/Goal in the fast-follow) is a one-line change to that map, not a new file.
 - **Popover anchor is mouse coords**, not xyflow node ref. `SegmentPopover` accepts `{x, y}` captured from the badge click's `event.clientX/Y`. Phase 5 / fast-follows that need to open the popover programmatically (e.g., a breadcrumb-click → popover deep-link) will need a different anchor strategy (probably xyflow `useReactFlow().getNode(id)` → DOM rect).
 - **`useSegmentCounts` is dedupe-stable** (`src/hooks/useSegmentCounts.ts`): on each poll it shallow-compares before calling `setCounts`, so unchanged results don't propagate identity churn into `useGraphData` (which would otherwise re-run dagre layout every poll). Callers can wire it without worrying about thrashing.
 - **`/api/segments/merge` and `/api/segments/split` endpoints**: atomic via `db.transaction`. Inputs are soft-deleted (`deleted_at`), new segments inherit lineage/thread_id/archive_file from the first input. Return shape mirrors `insertSegment`: `{success, segment, mergedFrom}` for merge, `{success, segments, splitFrom}` for split. Both go through the `MULTISEMANTIC_LOCK_KEY` lock.
+- **`recordRetrievalEvent(db, {query, citedIds, uncitedIds, contributingIndexes?})`** (`multisemantic-db.js`) is the canonical retrieval-event recorder. One `db.transaction`, one shared `retrieved_at` across cited (helpful=1) and uncited (helpful=0) rows — that shared timestamp is load-bearing for the §6 snapshot. Legacy `recordRetrievalFeedback({segmentIds, helpful})` now delegates to it; new code should call `recordRetrievalEvent` directly.
+- **`getEvalSnapshot(db, {since?, until?})`** (`multisemantic-db.js`) is a single SQL query using `COUNT(DISTINCT CASE WHEN helpful=1 THEN ... END)` to compute both `events_total` and `events_cited` in one pass. Schema now carries `idx_rf_retrieved_at` so the window filter is index-backed.
 - **`LineageBreadcrumb` renders inside a `<Fragment key={idx}>`** in `DayPlanner.tsx`'s message map — no wrapper div. Only fires when `message.retrievalState?.segmentIds.length > 0`.
 - **§9 tests already shipped** (move out of later-phase test lists):
   - Phase 0: `fts-finds-newly-written-segment`, `fts-tokenizer-handles-identifiers`, `lineage-filter-returns-only-matching-segments`.
@@ -34,6 +36,7 @@ Cross-cutting facts the later phases should treat as established:
   - Phase 2: `cold-start-import-is-idempotent`.
   - Phase 3: `recall_segments` tool roundtrip (summaries default + transcript opt-in + lineage filter passthrough), `buildSystemContext` injection on/off, retrieval lineage-filter query construction, `Message.retrievalState` stash, citation-heuristic feedback POST, `/api/retrieval_feedback` insert + reject.
   - Phase 4: merge endpoint (concat transcripts + soft-delete inputs + reject malformed), split endpoint (boundary + soft-delete + reject out-of-range), `useSegmentCounts` (per-level fetch + refetch + empty short-circuit), `SegmentPopover` (lineage-filtered fetch + Merge enables only with ≥2 selected + POSTs to /merge), `LineageBreadcrumb` (names from current planner state + segment count + empty-state + partial lineage), `useGraphData` segmentCount threading.
+  - Phase 5: `/api/retrieval_feedback` new-shape POST roundtrip (cited+uncited atomically recorded with shared timestamp), new-shape both-arrays-empty rejection, `/api/segments/eval-snapshot` empty-corpus zeros, multi-turn cite-rate computation, since/until window filter. Client side: `recordRetrievalFeedback` posts cited_ids on citation AND posts uncited_ids when nothing cited (implicit-negative signal for §6.2).
 
 ---
 
@@ -144,16 +147,24 @@ Goal: per-node segment badges + popover + lineage breadcrumb + manual merge/spli
 
 **Gate met (with caveat above)**: graph renders with custom nodes; segment counts thread through; merge/split endpoints return expected shapes; `LineageBreadcrumb` renders only when `Message.retrievalState` is set; popover paginates at 20. Manual visual review still owed.
 
-## Phase 5 — Measurement plumbing (closes spec §6)
+## Phase 5 — Measurement plumbing (closes spec §6) — **SHIPPED**
 
 Goal: pre-registered decision rule recorded; data flows to measure it.
 
-1. Write `docs/decisions/002-multisemantic-retrieval-eval.md` containing the §6.3 rules verbatim plus measurement window start date. Per §6.6, this must exist **before** Phase 3's toggle is flipped on in production use.
-2. Confirm `retrieval_feedback` auto-population works (Phase 3 step 4). Add a small `/api/segments/eval-snapshot` endpoint returning cite-rate counts for the window — enables ad-hoc inspection without writing SQL.
+**Deltas worth carrying forward**:
 
-**Empirical-state caveat**: as of plan-edit time the segments table is empty and no `chat_archive_*.jsonl` files exist locally. The measurement window start date should not be backdated to the moment Phase 3's toggle flips on; the first weeks will be too sparse to evaluate. Set the window start *after* a usable corpus accumulates (heuristic: ≥30 segments with non-empty lineage), or after the lineage-repair wizard fast-follow backfills historical archives — whichever comes first.
+- **Decision doc shipped**: `docs/decisions/002-multisemantic-retrieval-eval.md` contains §6.3 verbatim. Window-start trigger set to "≥30 segments with non-empty lineage OR lineage-repair wizard ships" per the Phase 5 caveat — not backdated to toggle-flip. The doc has a literal `Window opened: <unset>` line to be filled in when the trigger fires.
+- **`retrieval_feedback` auto-population was incomplete**: only cited segments (`helpful=1`) were being recorded. Spec §6.2 implicit-negatives (retrieved-but-not-cited) had no row, so the §6.3 denominator (retrieval events) could not be computed from the table. **Fixed** by reshaping the `/api/retrieval_feedback` payload to `{query, cited_ids, uncited_ids}`. Both arrays are written in one atomic `db.transaction` with one shared `retrieved_at`, so distinct `(query_hash, retrieved_at)` is the honest retrieval-event count. The legacy `{segment_ids, helpful}` shape is preserved (existing test passes unchanged).
+- **`recordRetrievalEvent` is the new canonical recorder** (`multisemantic-db.js`). One transaction, one timestamp, both helpful classes. Legacy `recordRetrievalFeedback` delegates to it via `helpful ? citedIds : uncitedIds`, so the prepared-statement INSERT and the queryHash/contribStr boilerplate live in one place. The endpoint just translates request shapes — the "shared retrieved_at" invariant is no longer leaked into the HTTP layer. (This factoring landed during the /simplify pass; the earlier "optional retrievedAt param on recordRetrievalFeedback" approach was reverted.)
+- **`getEvalSnapshot(db, {since?, until?})`** (`multisemantic-db.js`) is the single SQL surface for the §6.3 counts: `retrievalEvents`, `citedRetrievals`, `citeRate`, `segmentsRetrieved`, `segmentsCited`. Implemented as ONE query with `COUNT(DISTINCT CASE WHEN helpful=1 THEN ... END)` for the cited-events subset (collapsed from two queries during /simplify). Both `since` and `until` are inclusive ISO bounds; both optional.
+- **`idx_rf_retrieved_at`** index added in the schema block — the snapshot's window filter is now index-backed instead of full-scan.
+- **`GET /api/segments/eval-snapshot?since=&until=`** wraps the helper. Returned JSON shape matches the spec §6.3 vocabulary one-for-one.
+- **Client `recordRetrievalFeedback`** (`src/services/multisemanticRetrieval.ts`) signature changed: `(query, citedIds, uncitedIds = [])`. Fire-and-forget pattern preserved. Caller in `usePlannerAI.ts:177-183` now computes `uncited = retrieved.segments.filter(s => !citedSet.has(s.id))` and passes both arrays.
+- **Test deltas**: 5 new tests in `multisemantic-db.test.js` (new-shape POST roundtrip, snapshot empty-corpus, snapshot multi-turn cite-rate, snapshot since-window filter, new-shape both-empty rejection). 1 client test renamed and inverted in `usePlannerAI.retrieval.test.ts`: the previous "does not post when nothing cited" expectation was wrong relative to spec §6.2 — the test now asserts the uncited segment IS posted (with empty `cited_ids`). 94/94 tests pass.
 
-**Gate**: decision doc exists, snapshot endpoint returns sensible numbers after a few injected turns in dev.
+**Empirical-state caveat (still applies)**: segments table empty today, no archive files exist locally. Window-opening trigger must fire before measurement begins; see decision doc 002 §Window. Until then the snapshot endpoint will return zeros, which is the correct signal that the rule cannot yet be evaluated.
+
+**Gate met**: decision doc exists, snapshot endpoint returns sensible numbers (verified via the multi-turn snapshot test: 2 events, 1 cited, 0.5 cite rate, 4 segments retrieved, 1 cited). Lint + tsc-build + tests all clean.
 
 ---
 
@@ -174,7 +185,7 @@ Phases are written in dependency order. Actual commit cadence so far:
 - Phase 2 shipped standalone (`1615e95`), plus a three-agent review pass (`907566f`) and a tsc-build fixture fix (`8b08f2b`).
 - Phase 3 shipped as one feat commit + plan revision. Reversible behind toggle (`enableRelevantPastContext` default off); reverting drops the new files but the `Message.retrievalState` field is additive and harmless if left in `services/types.ts`.
 - Phase 4 shipped as one feat commit + /simplify pass + plan revision. Reversible: revert the commit; the new endpoints (`/api/segments/merge`, `/api/segments/split`) and UI components are additive and don't change the segment write/read contract that earlier phases rely on.
-- Phase 5 — one PR (decision doc + snapshot endpoint).
+- Phase 5 shipped as decision doc + snapshot endpoint + auto-population fix + /simplify pass (`recordRetrievalEvent` factoring, single-query `getEvalSnapshot`, `idx_rf_retrieved_at` index). Reversible at the API layer (legacy `{segment_ids, helpful}` shape still works); the fix to record uncited segments is a one-line revert in `usePlannerAI.ts` if rolled back.
 
 Each PR ends with the `pr-prep.md` workflow including the review-fix loop.
 

@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS retrieval_feedback (
 
 CREATE INDEX IF NOT EXISTS idx_rf_segment ON retrieval_feedback(segment_id);
 CREATE INDEX IF NOT EXISTS idx_rf_query ON retrieval_feedback(query_hash);
+CREATE INDEX IF NOT EXISTS idx_rf_retrieved_at ON retrieval_feedback(retrieved_at);
 `;
 
 export function openDatabase(dataDir) {
@@ -389,37 +390,55 @@ export function searchSegments(db, { query, lineageFilter, limit = 10 } = {}) {
     return db.prepare(sql).all({ ...lineageParams, limit }).map(rowToSegment);
 }
 
+const FEEDBACK_INSERT_SQL = `
+INSERT OR IGNORE INTO retrieval_feedback
+    (query_hash, query_text, segment_id, retrieved_at, helpful, contributing_indexes)
+VALUES (@query_hash, @query_text, @segment_id, @retrieved_at, @helpful, @contributing_indexes)
+`;
+
 // query_hash is a deterministic fingerprint of query text only (no secrets) used to
 // deduplicate identical (query, segment, retrieved_at) tuples via the table's UNIQUE
 // constraint. INSERT OR IGNORE makes duplicate writes within the same ms a no-op.
 export function recordRetrievalFeedback(db, { query, segmentIds, helpful = 1, contributingIndexes = ['bm25_fts'] }) {
     if (!Array.isArray(segmentIds) || segmentIds.length === 0) return { inserted: 0 };
+    return recordRetrievalEvent(db, {
+        query,
+        citedIds: helpful ? segmentIds : [],
+        uncitedIds: helpful ? [] : segmentIds,
+        contributingIndexes,
+    });
+}
+
+// Records one retrieval event as a single atomic transaction with a shared
+// retrieved_at across cited (helpful=1) and uncited (helpful=0) rows. The shared
+// timestamp is load-bearing: the §6 snapshot counts distinct
+// (query_hash, retrieved_at) tuples as retrieval events, so splitting a single
+// event across two timestamps would double-count the denominator.
+export function recordRetrievalEvent(db, { query, citedIds = [], uncitedIds = [], contributingIndexes = ['bm25_fts'] }) {
+    if (citedIds.length === 0 && uncitedIds.length === 0) return { inserted: 0 };
     const retrievedAt = new Date().toISOString();
     const queryText = String(query ?? '');
     const queryHash = simpleHash(queryText);
     const contribStr = JSON.stringify(contributingIndexes);
-
-    const stmt = db.prepare(`
-        INSERT OR IGNORE INTO retrieval_feedback
-            (query_hash, query_text, segment_id, retrieved_at, helpful, contributing_indexes)
-        VALUES (@query_hash, @query_text, @segment_id, @retrieved_at, @helpful, @contributing_indexes)
-    `);
+    const stmt = db.prepare(FEEDBACK_INSERT_SQL);
 
     let inserted = 0;
-    const tx = db.transaction(() => {
-        for (const segmentId of segmentIds) {
-            const result = stmt.run({
-                query_hash: queryHash,
-                query_text: queryText,
-                segment_id: segmentId,
-                retrieved_at: retrievedAt,
-                helpful: helpful ? 1 : 0,
-                contributing_indexes: contribStr,
-            });
-            if (result.changes > 0) inserted++;
-        }
-    });
-    tx();
+    const insertRow = (segmentId, helpful) => {
+        const result = stmt.run({
+            query_hash: queryHash,
+            query_text: queryText,
+            segment_id: segmentId,
+            retrieved_at: retrievedAt,
+            helpful,
+            contributing_indexes: contribStr,
+        });
+        if (result.changes > 0) inserted++;
+    };
+
+    db.transaction(() => {
+        for (const id of citedIds) insertRow(id, 1);
+        for (const id of uncitedIds) insertRow(id, 0);
+    })();
     return { inserted };
 }
 
@@ -438,6 +457,43 @@ export function getFeedbackForSegment(db, segmentId) {
     return db.prepare(
         'SELECT id, query_hash, query_text, retrieved_at, helpful, contributing_indexes FROM retrieval_feedback WHERE segment_id = ? ORDER BY retrieved_at DESC'
     ).all(segmentId);
+}
+
+// Aggregate counts for the §6 retrieval evaluation. The decision rule in
+// `docs/decisions/002-multisemantic-retrieval-eval.md` consumes:
+//   - retrievalEvents = distinct (query_hash, retrieved_at) tuples in window
+//   - citedRetrievals = retrieval events where ≥1 segment was cited (helpful = 1)
+//   - citeRate = citedRetrievals / retrievalEvents
+//   - segmentsRetrieved / segmentsCited = row-level totals
+// `since` and `until` are ISO timestamps; both optional. Inclusive bounds.
+export function getEvalSnapshot(db, { since, until } = {}) {
+    const params = {};
+    const clauses = [];
+    if (since) { clauses.push('retrieved_at >= @since'); params.since = since; }
+    if (until) { clauses.push('retrieved_at <= @until'); params.until = until; }
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
+    const row = db.prepare(`
+        SELECT
+          COUNT(DISTINCT query_hash || ':' || retrieved_at) AS events_total,
+          COUNT(DISTINCT CASE WHEN helpful = 1 THEN query_hash || ':' || retrieved_at END) AS events_cited,
+          COUNT(*) AS rows_total,
+          SUM(CASE WHEN helpful = 1 THEN 1 ELSE 0 END) AS rows_cited
+        FROM retrieval_feedback
+        ${where}
+    `).get(params) || {};
+
+    const retrievalEvents = row.events_total || 0;
+    const citedRetrievals = row.events_cited || 0;
+    return {
+        since: since ?? null,
+        until: until ?? null,
+        retrievalEvents,
+        citedRetrievals,
+        citeRate: retrievalEvents > 0 ? citedRetrievals / retrievalEvents : 0,
+        segmentsRetrieved: row.rows_total || 0,
+        segmentsCited: row.rows_cited || 0,
+    };
 }
 
 export function countSegmentsByLineage(db, level, ids) {

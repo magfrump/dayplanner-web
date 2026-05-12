@@ -176,7 +176,9 @@ export const usePlannerAI = (
 
             if (retrieved && retrieved.segments.length > 0) {
                 const cited = detectCitedSegments(finalAssistantContent, retrieved.segments);
-                recordRetrievalFeedback(lastUserText(updatedConversation), cited);
+                const citedSet = new Set(cited);
+                const uncited = retrieved.segments.map(s => s.id).filter(id => !citedSet.has(id));
+                recordRetrievalFeedback(lastUserText(updatedConversation), cited, uncited);
             }
         } catch (error: unknown) {
             console.error('Error calling LLM API:', error);
