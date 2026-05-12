@@ -1,9 +1,10 @@
 
-import { useState, useRef, useEffect } from 'react';
+import { Fragment, useState, useRef, useEffect } from 'react';
 import { Send, Settings } from 'lucide-react';
 import { SettingsModal } from './components/SettingsModal';
 import { SummaryCard } from './components/Chat/SummaryCard';
 import { ChatMessage } from './components/Chat/ChatMessage';
+import { LineageBreadcrumb } from './components/Chat/LineageBreadcrumb';
 import GraphView from './components/Planner/GraphView';
 import { PlannerDataView } from './components/Planner/PlannerDataView';
 import { usePlannerData } from './hooks/usePlannerData';
@@ -174,11 +175,21 @@ const DayPlanner = () => {
                             }
 
                             return (
-                                <ChatMessage
-                                    key={idx}
-                                    message={msg}
-                                    onViewTrace={msg.role === 'assistant' ? setViewingTrace : undefined}
-                                />
+                                <Fragment key={idx}>
+                                    {msg.role === 'assistant' && msg.retrievalState && (
+                                        <LineageBreadcrumb
+                                            retrievalState={msg.retrievalState}
+                                            values={values}
+                                            goals={goals}
+                                            projects={projects}
+                                            tasks={tasks}
+                                        />
+                                    )}
+                                    <ChatMessage
+                                        message={msg}
+                                        onViewTrace={msg.role === 'assistant' ? setViewingTrace : undefined}
+                                    />
+                                </Fragment>
                             );
                         })}
                         {isLoading && (

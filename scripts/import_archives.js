@@ -19,9 +19,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
-import { openDatabase, insertSegment, snapshotIfStale } from '../multisemantic-db.js';
+import { openDatabase, insertSegment, snapshotIfStale, makeSegmentId } from '../multisemantic-db.js';
 
-const makeSegmentId = () => `seg-${randomUUID()}`;
 const makeThreadId = () => `thread-${randomUUID()}`;
 
 const LOGS_DIR = path.resolve(process.env.LOGS_DIR || 'logs');

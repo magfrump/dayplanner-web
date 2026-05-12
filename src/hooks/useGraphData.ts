@@ -3,10 +3,15 @@ import { MarkerType, Position } from '@xyflow/react';
 import dagre from 'dagre';
 import type { Node, Edge } from '@xyflow/react';
 import type { Value, Goal, Project, Task } from '../types/planner';
+import { segmentCountKey, type SegmentCountLevel } from './useSegmentCounts';
+import type React from 'react';
 
 // Layout configuration
 const nodeWidth = 180;
 const nodeHeight = 50;
+
+type SegmentCountMap = Record<string, number>;
+type BadgeClickHandler = (level: SegmentCountLevel, id: number, event: React.MouseEvent) => void;
 
 /**
  * Transforms flat Planner Data into React Flow Nodes and Edges
@@ -16,7 +21,9 @@ export const useGraphData = (
     values: Value[],
     goals: Goal[],
     projects: Project[],
-    tasks: Task[]
+    tasks: Task[],
+    segmentCounts: SegmentCountMap = {},
+    onBadgeClick?: BadgeClickHandler,
 ) => {
     return useMemo(() => {
         const nodes: Node[] = [];
@@ -27,40 +34,56 @@ export const useGraphData = (
         values.forEach(v => {
             nodes.push({
                 id: `value-${v.id}`,
-                data: { label: v.name, type: 'value', originalId: v.id, color: v.color || '#6b7280' },
+                data: {
+                    label: v.name, type: 'value', originalId: v.id, color: v.color || '#6b7280',
+                    segmentCount: segmentCounts[segmentCountKey('value', v.id)] ?? 0,
+                    onBadgeClick,
+                },
                 position: { x: 0, y: 0 },
                 style: { backgroundColor: '#f3f4f6', border: '1px solid #9ca3af', width: nodeWidth, borderRadius: '8px' },
-                type: 'default'
+                type: 'value'
             });
         });
 
         goals.forEach(g => {
             nodes.push({
                 id: `goal-${g.id}`,
-                data: { label: g.name, type: 'goal', originalId: g.id },
+                data: {
+                    label: g.name, type: 'goal', originalId: g.id,
+                    segmentCount: segmentCounts[segmentCountKey('goal', g.id)] ?? 0,
+                    onBadgeClick,
+                },
                 position: { x: 0, y: 0 },
                 style: { backgroundColor: '#eff6ff', border: '1px solid #60a5fa', width: nodeWidth, borderRadius: '8px' },
-                type: 'default'
+                type: 'goal'
             });
         });
 
         projects.forEach(p => {
             nodes.push({
                 id: `project-${p.id}`,
-                data: { label: p.name, type: 'project', originalId: p.id },
+                data: {
+                    label: p.name, type: 'project', originalId: p.id,
+                    segmentCount: segmentCounts[segmentCountKey('project', p.id)] ?? 0,
+                    onBadgeClick,
+                },
                 position: { x: 0, y: 0 },
                 style: { backgroundColor: '#f0fdf4', border: '1px solid #4ade80', width: nodeWidth, borderRadius: '8px' },
-                type: 'default'
+                type: 'project'
             });
         });
 
         tasks.forEach(t => {
             nodes.push({
                 id: `task-${t.id}`,
-                data: { label: t.name, type: 'task', originalId: t.id },
+                data: {
+                    label: t.name, type: 'task', originalId: t.id,
+                    segmentCount: segmentCounts[segmentCountKey('task', t.id)] ?? 0,
+                    onBadgeClick,
+                },
                 position: { x: 0, y: 0 },
                 style: { backgroundColor: t.completed ? '#f9fafb' : '#fffbeb', border: t.completed ? '1px dashed #d1d5db' : '1px solid #fcd34d', width: nodeWidth, borderRadius: '8px', opacity: t.completed ? 0.7 : 1 },
-                type: 'default'
+                type: 'task'
             });
         });
 
@@ -139,5 +162,5 @@ export const useGraphData = (
 
         return { nodes: layoutNodes, edges };
 
-    }, [values, goals, projects, tasks]);
+    }, [values, goals, projects, tasks, segmentCounts, onBadgeClick]);
 };

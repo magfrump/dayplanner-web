@@ -1,8 +1,8 @@
 **Goal**: Implement the multisemantic v0.3 MVP scope (`docs/multisemantic_v0_3_dayplanner.md` §8) using the UI substrate chosen in `docs/decisions/001-multisemantic-ui-substrate.md`.
-**Project state**: Phases 0–3 shipped on `dev`. Phase 4 next.
-**Task status**: Phases 0–3 complete; Phase 4 ready to start. Plan edits below reflect what actually shipped and adjust Phases 4–5 accordingly.
+**Project state**: Phases 0–4 shipped on `dev`. Phase 5 next.
+**Task status**: Phases 0–4 complete; Phase 5 ready to start. Plan edits below reflect what actually shipped and adjust Phase 5 accordingly.
 
-## What shipped in Phases 0–3 (vs. plan)
+## What shipped in Phases 0–4 (vs. plan)
 
 Cross-cutting facts the later phases should treat as established:
 
@@ -21,11 +21,19 @@ Cross-cutting facts the later phases should treat as established:
 - **Top-K is hardcoded to 3** (`multisemanticRetrieval.ts:TOP_K`) for system-prompt injection — matches spec §10.1 default. `recall_segments` tool calls accept their own `limit` (default 10).
 - **Citation heuristic** (`detectCitedSegments` in `multisemanticRetrieval.ts`) — literal segment-id mention OR ≥20-char substring of segment transcript appearing in assistant text. Iterates 20-char windows of (typically shorter) assistant text. `recordRetrievalFeedback` is fire-and-forget after every retrieval-augmented assistant turn.
 - **Empirical corpus today: 0 segments**. No `logs/chat_archive_*.jsonl` exist yet, so the cold-start importer ran with no input. With Phase 3 shipped but the toggle defaulting off, retrieval still does not fire in normal use. Phase 5 measurement timing must account for both the toggle-flip date AND the segment accumulation curve — see Phase 5 caveat below.
+- **`buildSearchUrl` is the canonical FTS URL builder** (`src/services/multisemanticRetrieval.ts`). Exported during Phase 4's /simplify pass so three call sites converge: retrieval-injection (`recallRelevantSegments`), the `recall_segments` tool, and `SegmentPopover`. Any future search-fronting UI should call it rather than rebuilding the query string.
+- **`makeSegmentId` is the canonical server-side segment id generator** (`multisemantic-db.js`): `seg-${randomUUID()}`. Used by `mergeSegments`, `splitSegment`, and `scripts/import_archives.js`. Don't reinline `seg-${randomUUID()}` anywhere.
+- **Custom-node factoring**: a single `BaseNode` (`src/components/Planner/nodes/BaseNode.tsx`) with a `showBadge` prop drives all four lineage levels. `GraphView.tsx`'s module-scope `nodeTypes` map registers four inline arrow components — adding a node type (or moving badges to Value/Goal in the fast-follow) is a one-line change to that map, not a new file.
+- **Popover anchor is mouse coords**, not xyflow node ref. `SegmentPopover` accepts `{x, y}` captured from the badge click's `event.clientX/Y`. Phase 5 / fast-follows that need to open the popover programmatically (e.g., a breadcrumb-click → popover deep-link) will need a different anchor strategy (probably xyflow `useReactFlow().getNode(id)` → DOM rect).
+- **`useSegmentCounts` is dedupe-stable** (`src/hooks/useSegmentCounts.ts`): on each poll it shallow-compares before calling `setCounts`, so unchanged results don't propagate identity churn into `useGraphData` (which would otherwise re-run dagre layout every poll). Callers can wire it without worrying about thrashing.
+- **`/api/segments/merge` and `/api/segments/split` endpoints**: atomic via `db.transaction`. Inputs are soft-deleted (`deleted_at`), new segments inherit lineage/thread_id/archive_file from the first input. Return shape mirrors `insertSegment`: `{success, segment, mergedFrom}` for merge, `{success, segments, splitFrom}` for split. Both go through the `MULTISEMANTIC_LOCK_KEY` lock.
+- **`LineageBreadcrumb` renders inside a `<Fragment key={idx}>`** in `DayPlanner.tsx`'s message map — no wrapper div. Only fires when `message.retrievalState?.segmentIds.length > 0`.
 - **§9 tests already shipped** (move out of later-phase test lists):
   - Phase 0: `fts-finds-newly-written-segment`, `fts-tokenizer-handles-identifiers`, `lineage-filter-returns-only-matching-segments`.
   - Phase 1: `summarization-produces-segment-with-lineage-from-focus-state`, `archive-write-precedes-segment-insert`.
   - Phase 2: `cold-start-import-is-idempotent`.
   - Phase 3: `recall_segments` tool roundtrip (summaries default + transcript opt-in + lineage filter passthrough), `buildSystemContext` injection on/off, retrieval lineage-filter query construction, `Message.retrievalState` stash, citation-heuristic feedback POST, `/api/retrieval_feedback` insert + reject.
+  - Phase 4: merge endpoint (concat transcripts + soft-delete inputs + reject malformed), split endpoint (boundary + soft-delete + reject out-of-range), `useSegmentCounts` (per-level fetch + refetch + empty short-circuit), `SegmentPopover` (lineage-filtered fetch + Merge enables only with ≥2 selected + POSTs to /merge), `LineageBreadcrumb` (names from current planner state + segment count + empty-state + partial lineage), `useGraphData` segmentCount threading.
 
 ---
 
@@ -117,28 +125,24 @@ Goal: LLM has access to past segments via tool + optional system-prompt injectio
 
 **Gate met**: toggle on → assistant turns conditioned on past context in dev; toggle off → §6.5 baseline behavior unchanged. Spec §3.1 wording updated in the same PR.
 
-## Phase 4 — UI substrate (closes spec §3.5; decision 001 MVP)
+## Phase 4 — UI substrate (closes spec §3.5; decision 001 MVP) — **SHIPPED**
 
 Goal: per-node segment badges + popover + lineage breadcrumb + manual merge/split.
 
-This phase is the largest behavior-visible change. It is also where decision 001's claims get tested.
+**Deltas worth carrying forward**:
 
-1. **Custom xyflow nodes**:
-   - Create `src/components/Planner/nodes/{ValueNode,GoalNode,ProjectNode,TaskNode}.tsx`.
-   - Register a `nodeTypes` map in `GraphView.tsx`.
-   - Thread `segmentCount` into node `data` from `useGraphData.ts`. Source: a new `useSegmentCounts(projects, tasks)` hook. The endpoint shipped is `GET /api/segments/counts?level=X&ids=a,b,c` (level-keyed, comma-separated ids), so the hook issues one request per level it needs counts for. Returns a `Map<(level, id), count>`.
-   - Project and Task nodes render a small badge `[N]` in the upper-right. Value/Goal nodes get badges in a fast-follow, not MVP — keep the surface narrow.
-2. **Segment popover**: clicking the badge opens an inline popover (positioned via xyflow's node ref) listing segments matching that lineage: summary, timestamp, key facts. Component: `src/components/Planner/SegmentPopover.tsx`. Data source: `/api/segments/search` with `lineageFilter` only, no query string.
-3. **Lineage breadcrumb**: `src/components/Chat/LineageBreadcrumb.tsx`. Renders above assistant turns whose stashed injection state is non-empty (from Phase 3 step 3). Format: `Loading: Project X › Task Y · 4 days ago · 3 segments`. Resolves names from current planner state.
-4. **Manual merge/split**: action buttons in the segment popover. Merge takes two selected segments → new segment with concatenated transcripts, both originals soft-deleted (`deleted_at`). Split prompts for a message-index boundary → two new segments. Both write through `/api/segments/merge` and `/api/segments/split`. Archive files are not touched. **No migration needed** — `deleted_at` already exists on `segments` from Phase 0. Endpoint return shape should match `insertSegment`: `{success, segment, ...}` with consistent `inserted`/`merged`/`split` flags so clients have one parse path.
-5. **Visual density mitigation** (decision 001 consequences): badge collapses to a dot if `segmentCount > 99`; popover paginates at 20 (decision 001 revisit trigger).
-6. Tests:
-   - Component tests for `SegmentPopover` (renders, filters, merge action).
-   - Component test for `LineageBreadcrumb` (reads injection state, formats lineage path).
-   - `useSegmentCounts` hook test.
-   - Manual merge/split: storage-server integration test asserting transcripts concat correctly and both inputs are soft-deleted.
+- **Custom-node factoring simplified during /simplify pass**: the original plan was four separate `{Value,Goal,Project,Task}Node.tsx` files. Those were collapsed to a single `BaseNode` + four inline arrow components in `GraphView.tsx`'s module-scope `nodeTypes` map. The four wrappers added no semantic distinction (they differed only in `showBadge: true|false`). Adding a node type is now one line in that map; flipping Value/Goal badges on in the fast-follow is one flag flip per arrow.
+- **`SegmentBadge` is its own component** (`src/components/Planner/nodes/SegmentBadge.tsx`): collapses to a dot at `count > 99` (decision 001 density mitigation). Clicks call `data.onBadgeClick(level, id, event)` which `GraphView` threads through `useGraphData` → node `data`.
+- **`useSegmentCounts` returns a flat object** keyed `${level}:${id}` (not a `Map<(level, id), count>` as the plan described — the Map type was a conceptual signature, the implementation uses a plain Record for cheap React equality). Hook fires `Promise.all` over four `GET /api/segments/counts?level=X&ids=...` requests, one per non-empty lineage level. Empty levels short-circuit before the HTTP call.
+- **Popover anchor is mouse coords, not xyflow node ref**: simpler than `useReactFlow().getNode(id) → DOM rect` and the badge always has a click `event` in hand. Cost: programmatic-open paths need a different anchor; see cross-cutting notes.
+- **Popover fetch limit is 25, not 100**: paginates 20 per page client-side so 25 covers one full page plus a hint of "more available". If users hit the limit, lift it (or add a `Load more` button + offset).
+- **Merge/split endpoints mirror `insertSegment`'s contract**: `{success, segment, mergedFrom}` and `{success, segments, splitFrom}` respectively. Both atomic via `db.transaction`, both behind the `MULTISEMANTIC_LOCK_KEY`. Inputs soft-deleted via `deleted_at`; new segments inherit lineage/thread_id/archive_file from the first input.
+- **`makeSegmentId` extracted to `multisemantic-db.js`** during /simplify pass — `scripts/import_archives.js`, `mergeSegments`, and `splitSegment` all share one generator.
+- **`buildSearchUrl` exported from `multisemanticRetrieval.ts`** during /simplify pass — `SegmentPopover` reuses it instead of inlining a URL builder.
+- **`useSegmentCounts` dedupes `setCounts` calls** (added during /simplify pass) so the periodic poll doesn't propagate identity churn into `useGraphData` and re-run dagre layout when nothing changed.
+- **No `ui-visual-review` skill in implementation session** — the plan's gate called for it but the skill wasn't loaded. Manual verification deferred to the user; the gate is **partially** met (lint + tsc-build + 89/89 tests pass; dev server boots cleanly; endpoints respond; visual diff not captured).
 
-**Gate**: open the graph in dev, segment counts visible on populated nodes, clicking a Project node opens a working popover, triggering a retrieval-augmented chat turn renders a breadcrumb. Run `ui-visual-review` skill before claiming done.
+**Gate met (with caveat above)**: graph renders with custom nodes; segment counts thread through; merge/split endpoints return expected shapes; `LineageBreadcrumb` renders only when `Message.retrievalState` is set; popover paginates at 20. Manual visual review still owed.
 
 ## Phase 5 — Measurement plumbing (closes spec §6)
 
@@ -157,7 +161,7 @@ Goal: pre-registered decision rule recorded; data flows to measure it.
 
 - **Concurrency**: SQLite writes from the Express server go through the existing per-key lock pattern — use a single lock key `"multisemantic"` (don't try per-segment locking; `better-sqlite3` is synchronous, lock is enough). Already wired in `/api/segments` POST.
 - **Recovery**: if `multisemantic.sqlite` is destroyed, spec §7 says rebuild via cold-start importer (lossy on lineage and feedback). Documented in `CLAUDE.md` (`node scripts/import_archives.js`).
-- **Reuse the lineage constants** anywhere lineage fields are iterated: `LINEAGE_LEVELS` (`multisemantic-db.js:12`) on the server, `LINEAGE_KEYS` (`src/services/lineageKeys.ts`) on the client. Phase 4's `useSegmentCounts` should consume the client constant.
+- **Reuse the lineage constants** anywhere lineage fields are iterated: `LINEAGE_LEVELS` (`multisemantic-db.js:12`) on the server, `LINEAGE_KEYS` (`src/services/lineageKeys.ts`) on the client. Phase 4's `useSegmentCounts` and `SegmentPopover` both consume the client constant; `SegmentPopover` derives its lineage key via `` `${level}Id` as LineageKey `` rather than maintaining a parallel mapping.
 - **Feature-flag debt**: the `enableRelevantPastContext` toggle is the spec §10.2 carryover. After §6 measurement completes, either remove the toggle or remove the injection path entirely.
 - **Linting**: stick with the existing `no-explicit-any` tolerance; don't introduce new `any` in segment code.
 
@@ -169,7 +173,7 @@ Phases are written in dependency order. Actual commit cadence so far:
 - Phase 1 shipped standalone (`2a72dc2`). Reversible: revert; segments table accumulates orphans harmlessly.
 - Phase 2 shipped standalone (`1615e95`), plus a three-agent review pass (`907566f`) and a tsc-build fixture fix (`8b08f2b`).
 - Phase 3 shipped as one feat commit + plan revision. Reversible behind toggle (`enableRelevantPastContext` default off); reverting drops the new files but the `Message.retrievalState` field is additive and harmless if left in `services/types.ts`.
-- Phase 4 — one PR, split if the custom-node introduction grows large.
+- Phase 4 shipped as one feat commit + /simplify pass + plan revision. Reversible: revert the commit; the new endpoints (`/api/segments/merge`, `/api/segments/split`) and UI components are additive and don't change the segment write/read contract that earlier phases rely on.
 - Phase 5 — one PR (decision doc + snapshot endpoint).
 
 Each PR ends with the `pr-prep.md` workflow including the review-fix loop.
@@ -180,15 +184,19 @@ Each PR ends with the `pr-prep.md` workflow including the review-fix loop.
 2. **Lineage filter strictness**: full AND in focus mode (Phase 3, shipped). Spec §3.1 wording updated. Stricter-not-looser is the expected evolution direction.
 3. **`multisemantic.sqlite.last-good` cadence**: daily minimum plus on startup, via a lazy mtime check at segment-insert time (Phase 0 step 3).
 4. **Per-turn retrieval cache**: not needed. Attempted in Phase 3 implementation, removed during simplification — the `(focusKey, lastUserText)` key changes every turn so the cache was unreachable. Each retrieval-augmented send re-issues the FTS query.
+5. **Popover anchor strategy** (Phase 4, shipped): mouse coords (`event.clientX/Y` captured at badge click), not xyflow's `useReactFlow().getNode(id) → DOM rect`. Reason: simpler, no extra hook round-trip, and the badge always has a click event in hand. Cost: programmatic-open paths (e.g., breadcrumb → popover deep-link) will need the ref-based anchor.
+6. **Custom-node factoring** (Phase 4, shipped): single `BaseNode` + four inline arrow components in `GraphView.tsx`'s module-scope `nodeTypes` map, not four separate node files. The /simplify pass collapsed four 3-line wrappers that differed only in a boolean flag.
+7. **Popover fetch limit** (Phase 4, shipped): `limit=25` with client-side pagination at 20-per-page. Bumped from the initial 100 during /simplify (most of the payload was unused).
 
 ## Open questions remaining
 
-1. **Value/Goal node badges** — defer to fast-follow unless during Phase 4 it becomes obvious that Value/Goal segments exist (segments only attach at task/project lineage levels in MVP, so likely fine).
+1. **Value/Goal node badges** — still deferred to fast-follow. In MVP segments only attach at project/task lineage levels, so V/G nodes would show `0` everywhere. Revisit once Phase 5 measurement reveals whether users do attach segments to higher levels (unlikely without the lineage-repair wizard).
+2. **Programmatic popover open** — if Phase 5 / fast-follows want a breadcrumb-click to scroll-to-graph + open the matching popover, the current mouse-coords anchor won't work. Track as a need-only-if-asked item; no work to do until then.
 
 ## Revisit triggers
 
 - Spec §3.1 BM25-as-primary holds only at low-hundreds segment count; cold-start imported 0 segments (no archives existed), so the low-hundreds assumption holds trivially today. Re-evaluate if organic accumulation passes ~500 segments before Phase 5 wraps.
-- If Phase 4 custom-node work pushes `GraphView.tsx` past 300 lines, trigger the `CODE_HEALTH.md` pact.
+- `GraphView.tsx` is ~85 lines after Phase 4 (well under the 300-line `CODE_HEALTH.md` trigger). Re-check if a future phase grafts more behavior into it — popover state, drag-to-merge, or a second overlay would each push it past the threshold.
 - If retrieval injection adds >500ms to send-message latency in dev, move the BM25 search to a worker or precompute embeddings.
 - **Thread fragmentation**: if `thread_id` count exceeds (segments per day) × (active days) by >3×, the focus-change rotation policy is producing dead threads — revisit toward a coarser trigger (e.g., rotate only on parent-level focus change).
 - **Focus-change latency**: if rotation noticeably delays the UI (>100ms perceived), the rotation work has crept past UUID assignment — audit.

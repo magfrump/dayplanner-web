@@ -10,6 +10,8 @@ import {
     searchSegments,
     countSegmentsByLineage,
     recordRetrievalFeedback,
+    mergeSegments,
+    splitSegment,
     LINEAGE_LEVELS,
 } from './multisemantic-db.js';
 
@@ -365,6 +367,58 @@ app.post('/api/retrieval_feedback', async (req, res) => {
         });
     } catch (error) {
         console.error('Retrieval feedback error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/segments/merge', async (req, res) => {
+    try {
+        await acquireLock(MULTISEMANTIC_LOCK_KEY, async () => {
+            const { segmentIds, newId, summary } = req.body || {};
+            if (!Array.isArray(segmentIds) || segmentIds.length < 2) {
+                res.status(400).json({ error: 'segmentIds must be an array of length >= 2' });
+                return;
+            }
+            try {
+                const result = mergeSegments(segmentDb, { segmentIds, newId, summary });
+                try {
+                    await snapshotIfStale(DATA_DIR);
+                } catch (e) {
+                    console.error('Snapshot-after-merge failed:', e);
+                }
+                res.json({ success: true, segment: result.segment, mergedFrom: result.mergedFrom });
+            } catch (e) {
+                res.status(400).json({ error: e.message });
+            }
+        });
+    } catch (error) {
+        console.error('Segment merge error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/segments/split', async (req, res) => {
+    try {
+        await acquireLock(MULTISEMANTIC_LOCK_KEY, async () => {
+            const { segmentId, boundaryIndex, newIds } = req.body || {};
+            if (!segmentId || !Number.isInteger(boundaryIndex)) {
+                res.status(400).json({ error: 'segmentId (string) and boundaryIndex (integer) are required' });
+                return;
+            }
+            try {
+                const result = splitSegment(segmentDb, { segmentId, boundaryIndex, newIds });
+                try {
+                    await snapshotIfStale(DATA_DIR);
+                } catch (e) {
+                    console.error('Snapshot-after-split failed:', e);
+                }
+                res.json({ success: true, segments: result.segments, splitFrom: result.splitFrom });
+            } catch (e) {
+                res.status(400).json({ error: e.message });
+            }
+        });
+    } catch (error) {
+        console.error('Segment split error:', error);
         res.status(500).json({ error: error.message });
     }
 });

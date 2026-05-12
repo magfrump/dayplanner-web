@@ -23,7 +23,7 @@ const TOP_K = 3;
 const hasAnyLineage = (l: SegmentLineage) =>
     LINEAGE_KEYS.some(k => l[k] != null);
 
-const buildSearchUrl = (query: string, lineage: SegmentLineage, limit: number) => {
+export const buildSearchUrl = (query: string, lineage: SegmentLineage, limit: number) => {
     const params = new URLSearchParams();
     if (query.trim()) params.set('q', query);
     for (const k of LINEAGE_KEYS) {

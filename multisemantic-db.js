@@ -1,6 +1,9 @@
 import Database from 'better-sqlite3';
 import fs from 'fs/promises';
 import path from 'path';
+import { randomUUID } from 'crypto';
+
+export const makeSegmentId = () => `seg-${randomUUID()}`;
 
 const DB_FILENAME = 'multisemantic.sqlite';
 const SNAPSHOT_FILENAME = 'multisemantic.sqlite.last-good';
@@ -202,6 +205,111 @@ export function insertSegment(db, segment) {
 export function getSegment(db, id) {
     const row = db.prepare('SELECT * FROM segments WHERE id = ? AND deleted_at IS NULL').get(id);
     return row ? rowToSegment(row) : null;
+}
+
+// Soft-delete the listed ids and create a new segment whose transcript is the
+// concatenation of theirs in input order. Lineage, thread_id, and archive_file
+// inherit from the first input — the UI filters the popover by lineage, so all
+// merge inputs share it in practice. Runs atomically.
+//
+// Returns { segment, mergedFrom: [ids] }. Throws if any id is missing or already deleted.
+export function mergeSegments(db, { segmentIds, newId, summary } = {}) {
+    if (!Array.isArray(segmentIds) || segmentIds.length < 2) {
+        throw new Error('mergeSegments requires at least 2 segmentIds');
+    }
+    const stmt = db.prepare('SELECT * FROM segments WHERE id = ? AND deleted_at IS NULL');
+    const rows = segmentIds.map(id => {
+        const row = stmt.get(id);
+        if (!row) throw new Error(`Segment not found or already deleted: ${id}`);
+        return row;
+    });
+
+    const transcript = rows.flatMap(r => JSON.parse(r.transcript_json));
+    const first = rows[0];
+    const mergedId = newId || makeSegmentId();
+
+    const tx = db.transaction(() => {
+        const softDelete = db.prepare('UPDATE segments SET deleted_at = ? WHERE id = ?');
+        const now = new Date().toISOString();
+        for (const r of rows) softDelete.run(now, r.id);
+
+        return insertSegment(db, {
+            id: mergedId,
+            thread_id: first.thread_id,
+            transcript,
+            summary: summary ?? first.summary ?? null,
+            lineage: {
+                valueId: first.value_id,
+                goalId: first.goal_id,
+                projectId: first.project_id,
+                taskId: first.task_id,
+            },
+            metadata: {
+                needs_classification: !!first.needs_classification,
+                open_loop: !!first.open_loop,
+                archive_file: first.archive_file,
+            },
+        });
+    });
+
+    const { segment, inserted } = tx();
+    if (!inserted) throw new Error(`Merge id collision: ${mergedId}`);
+    return { segment, mergedFrom: segmentIds.slice() };
+}
+
+// Soft-delete the original and create two new segments split at the given
+// boundaryIndex (messages[0..boundary) and messages[boundary..end]). Lineage,
+// thread_id, and archive_file inherit from the original. Runs atomically.
+//
+// Returns { segments: [first, second], splitFrom: id }. Throws if boundaryIndex
+// would produce an empty side or the source is missing/deleted.
+export function splitSegment(db, { segmentId, boundaryIndex, newIds } = {}) {
+    const row = db.prepare('SELECT * FROM segments WHERE id = ? AND deleted_at IS NULL').get(segmentId);
+    if (!row) throw new Error(`Segment not found or already deleted: ${segmentId}`);
+
+    const transcript = JSON.parse(row.transcript_json);
+    if (!Number.isInteger(boundaryIndex) || boundaryIndex <= 0 || boundaryIndex >= transcript.length) {
+        throw new Error(`boundaryIndex must be between 1 and transcript.length-1 (got ${boundaryIndex})`);
+    }
+
+    const [firstId, secondId] = newIds || [makeSegmentId(), makeSegmentId()];
+    const sharedFields = {
+        thread_id: row.thread_id,
+        summary: row.summary,
+        lineage: {
+            valueId: row.value_id,
+            goalId: row.goal_id,
+            projectId: row.project_id,
+            taskId: row.task_id,
+        },
+        metadata: {
+            needs_classification: !!row.needs_classification,
+            open_loop: !!row.open_loop,
+            archive_file: row.archive_file,
+        },
+    };
+
+    const tx = db.transaction(() => {
+        const now = new Date().toISOString();
+        db.prepare('UPDATE segments SET deleted_at = ? WHERE id = ?').run(now, segmentId);
+
+        const first = insertSegment(db, {
+            ...sharedFields,
+            id: firstId,
+            transcript: transcript.slice(0, boundaryIndex),
+        });
+        const second = insertSegment(db, {
+            ...sharedFields,
+            id: secondId,
+            transcript: transcript.slice(boundaryIndex),
+        });
+        if (!first.inserted || !second.inserted) {
+            throw new Error(`Split id collision: ${firstId} or ${secondId}`);
+        }
+        return [first.segment, second.segment];
+    });
+
+    return { segments: tx(), splitFrom: segmentId };
 }
 
 function rowToSegment(row) {
