@@ -16,7 +16,7 @@ interface PlanControlsProps {
 
 export const PlanControls: React.FC<PlanControlsProps> = (props) => {
     return (
-        <div className="flex flex-col gap-4 w-72 shrink-0">
+        <div className="flex flex-col gap-4 w-full md:w-72 md:shrink-0">
             <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/50 p-4">
                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Planner Mode</h3>
                 <div className="-mx-2">

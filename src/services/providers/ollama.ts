@@ -16,7 +16,7 @@ export const OllamaProvider: LLMProvider = {
 
         const allMessages = [
             { role: 'system', content: systemPrompt },
-            ...messages
+            ...messages.map(m => ({ role: m.role, content: m.content }))
         ];
 
         const response = await fetch(`${baseUrl}/api/chat`, {

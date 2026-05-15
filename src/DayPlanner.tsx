@@ -165,9 +165,9 @@ const DayPlanner = () => {
             { values, goals, projects, tasks }
         );
         return (
-            <div className="flex h-[calc(100vh-12rem)] gap-4">
+            <div className="flex flex-col gap-4 md:flex-row md:h-[calc(100dvh-12rem)]">
                 {/* Chat Area */}
-                <div className="flex-1 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/50 overflow-hidden flex flex-col">
+                <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/50 overflow-hidden flex flex-col h-[70dvh] md:h-auto md:flex-1 md:min-h-0">
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
                         {conversation.map((msg, idx) => {
                             if (msg.type === 'summary') {
@@ -346,7 +346,7 @@ const DayPlanner = () => {
                 />
             )}
             {activeTab === 'graph' && (
-                <div className="h-[calc(100vh-12rem)]">
+                <div className="h-[calc(100dvh-12rem)]">
                     <GraphView
                         values={values}
                         goals={goals}

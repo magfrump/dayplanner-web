@@ -41,6 +41,26 @@ export default defineConfig({
       '/api/read-file': {
         target: 'http://localhost:3002',
         changeOrigin: true,
+      },
+      '/api/log': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+      },
+      '/api/segments': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+      },
+      '/api/retrieval_feedback': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+      },
+      '/api/upload': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+      },
+      '/uploads': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
       }
     }
   }
