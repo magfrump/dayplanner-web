@@ -68,7 +68,7 @@ const acquireLock = async (key, fn) => {
 };
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 
 // Log all requests
 app.use((req, res, next) => {

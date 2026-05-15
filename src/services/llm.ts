@@ -17,10 +17,19 @@ export const getProvider = (id: string): LLMProvider => {
     return {
         ...provider,
         sendMessage: async (messages, systemPrompt, tools, config) => {
+            // Strip per-message debug/UI state before logging. Otherwise the prior
+            // turn's `traceData` (which itself embeds its own `messages` array) rides
+            // along, and each turn nests one level deeper — payload grows O(N²).
+            const tracedMessages: Message[] = messages.map(m => ({
+                role: m.role,
+                content: m.content,
+                id: m.id,
+            }));
+
             // Setup Trace Data
             const traceData: TraceData = {
                 direction: 'response',
-                messages,
+                messages: tracedMessages,
                 systemPrompt,
                 tools,
                 config: { ...config, apiKey: '***' } // Mask API key
@@ -48,10 +57,13 @@ export const getProvider = (id: string): LLMProvider => {
             try {
                 const response = await originalSendMessage(messages, systemPrompt, tools, config);
 
-                // Attach trace data to response
+                // Attach trace data to response. rawResponse copies primitive fields
+                // only — a `response` self-reference creates a circular structure that
+                // poisons the next turn's payload when this message gets sent back to
+                // the provider as conversation history (JSON.stringify throws).
                 response.traceData = {
                     ...traceData,
-                    rawResponse: response // Self-reference or specific raw data if providers returned it
+                    rawResponse: { content: response.content, toolCalls: response.toolCalls }
                 };
 
                 // Log Response
