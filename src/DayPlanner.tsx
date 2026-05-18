@@ -34,9 +34,9 @@ const DayPlanner = () => {
     // Custom Hooks
     const data = usePlannerData();
     const {
-        values, goals, projects, tasks, capacity,
+        values, goals, projects, tasks, capacity, savedFilters,
         isDataLoaded, saveError,
-        addItem, updateItem, deleteItem, toggleTask, setCapacity
+        addItem, updateItem, deleteItem, toggleTask, setCapacity, setSavedFilters
     } = data;
 
     const {
@@ -334,8 +334,8 @@ const DayPlanner = () => {
             {activeTab === 'plan' && renderPlanView()}
             {activeTab === 'data' && (
                 <PlannerDataView
-                    data={{ values, goals, projects, tasks, capacity }}
-                    actions={{ deleteItem, toggleTask, setCapacity }}
+                    data={{ values, goals, projects, tasks, capacity, savedFilters }}
+                    actions={{ deleteItem, toggleTask, setCapacity, setSavedFilters }}
                     ui={{
                         editMode,
                         setEditMode,

@@ -4,6 +4,7 @@ import { X, Save } from 'lucide-react';
 import { WORK_TYPES } from '../../types/planner';
 import type { Value, Goal, Project } from '../../types/planner';
 import type { EditModeState, EditItemData } from '../../types/ui';
+import { TagInput } from './TagInput';
 
 interface EditItemModalProps {
     editMode: EditModeState;
@@ -12,10 +13,11 @@ interface EditItemModalProps {
     values: Value[];
     goals: Goal[];
     projects: Project[];
+    allTags?: string[];
 }
 
 export const EditItemModal: React.FC<EditItemModalProps> = ({
-    editMode, setEditMode, onSave, values, goals, projects
+    editMode, setEditMode, onSave, values, goals, projects, allTags = []
 }) => {
     if (!editMode.type || !editMode.data) return null;
 
@@ -230,6 +232,15 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                         </div>
                     </>
                 )}
+
+                <div>
+                    <label className="block text-sm font-medium mb-1">Tags</label>
+                    <TagInput
+                        tags={data.tags || []}
+                        onChange={(tags) => updateData({ tags })}
+                        suggestions={allTags}
+                    />
+                </div>
 
                 <button
                     onClick={onSave}

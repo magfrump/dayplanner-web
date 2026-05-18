@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import type { Value, Goal, Project, Task, Capacity } from '../types/planner';
+import type { Value, Goal, Project, Task, Capacity, SavedFilter } from '../types/planner';
 import { initializeStorage } from '../utils/storagePolyfill';
 import { nextId } from '../utils/ids';
 
@@ -15,6 +15,7 @@ export const usePlannerData = () => {
     const [capacity, setCapacity] = useState<Capacity>({
         energy: 3, mood: 4, stress: 2, timeAvailable: 6, physicalState: 3
     });
+    const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
     const [isDataLoaded, setIsDataLoaded] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -22,12 +23,13 @@ export const usePlannerData = () => {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const [valuesResult, goalsResult, projectsResult, tasksResult, capacityResult] = await Promise.all([
+                const [valuesResult, goalsResult, projectsResult, tasksResult, capacityResult, filtersResult] = await Promise.all([
                     window.storage.get('planner-values').catch(() => ({ value: null })),
                     window.storage.get('planner-goals').catch(() => ({ value: null })),
                     window.storage.get('planner-projects').catch(() => ({ value: null })),
                     window.storage.get('planner-tasks').catch(() => ({ value: null })),
-                    window.storage.get('planner-capacity').catch(() => ({ value: null }))
+                    window.storage.get('planner-capacity').catch(() => ({ value: null })),
+                    window.storage.get('planner-saved-filters').catch(() => ({ value: null }))
                 ]);
 
                 // Defaults
@@ -59,6 +61,7 @@ export const usePlannerData = () => {
                 setProjects(parse(projectsResult, defaultProjects));
                 setTasks(parse(tasksResult, defaultTasks));
                 if (capacityResult?.value) setCapacity(JSON.parse(capacityResult.value));
+                setSavedFilters(parse(filtersResult, [] as SavedFilter[]));
 
                 setIsDataLoaded(true);
             } catch (error) {
@@ -79,6 +82,16 @@ export const usePlannerData = () => {
         }, 500);
         return () => clearTimeout(handler);
     }, [capacity, isDataLoaded]);
+
+    // Saved filters: persisted as a whole array (small enough; mutations are infrequent).
+    useEffect(() => {
+        if (!isDataLoaded) return;
+        const handler = setTimeout(() => {
+            window.storage.set('planner-saved-filters', JSON.stringify(savedFilters))
+                .catch(() => setSaveError('Failed to save filter changes.'));
+        }, 300);
+        return () => clearTimeout(handler);
+    }, [savedFilters, isDataLoaded]);
 
     // Error auto-clear
     useEffect(() => {
@@ -169,6 +182,7 @@ export const usePlannerData = () => {
         projects, setProjects,
         tasks, setTasks,
         capacity, setCapacity,
+        savedFilters, setSavedFilters,
         isDataLoaded,
         saveError,
         addItem, updateItem, deleteItem, toggleTask

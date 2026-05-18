@@ -3,6 +3,7 @@ import React from 'react';
 import { Plus, Edit2, Trash2, Calendar, Repeat, Paperclip } from 'lucide-react';
 import type { Task, Project, Goal, Value } from '../../types/planner';
 import { WORK_TYPES } from '../../types/planner';
+import { TagChips } from './TagChips';
 
 interface TasksSectionProps {
     tasks: Task[];
@@ -13,11 +14,14 @@ interface TasksSectionProps {
     onEdit: (task: Task) => void;
     onDelete: (id: number) => void;
     onToggle: (id: number) => void;
+    activeTags?: string[];
+    onTagClick?: (tag: string) => void;
 }
 
 export const TasksSection: React.FC<TasksSectionProps> = ({
     tasks, projects, goals, values,
-    onAdd, onEdit, onDelete, onToggle
+    onAdd, onEdit, onDelete, onToggle,
+    activeTags, onTagClick,
 }) => {
     return (
         <div className="bg-white rounded-lg border p-4">
@@ -46,7 +50,10 @@ export const TasksSection: React.FC<TasksSectionProps> = ({
                             />
                             <div className="w-4 h-4 rounded-full" style={{ backgroundColor: value?.color }} />
                             <div className="flex-1">
-                                <div className={task.completed ? 'line-through' : ''}>{task.name}</div>
+                                <div className="flex items-center gap-2">
+                                    <span className={task.completed ? 'line-through' : ''}>{task.name}</span>
+                                    <TagChips tags={task.tags} activeTags={activeTags} onTagClick={onTagClick} />
+                                </div>
                                 <div className="text-xs text-gray-500 flex flex-wrap gap-2 items-center mt-0.5">
                                     <span>{project?.name} • I:{task.importance} U:{task.urgency} • {workType.name}</span>
                                     {task.attachments && task.attachments.length > 0 && (

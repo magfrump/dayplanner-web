@@ -25,6 +25,8 @@ export const makeThreadId = (): string => `thread-${Date.now()}-${rand()}`;
 
 export const makeSegmentId = (): string => `seg-${Date.now()}-${rand()}`;
 
+export const makeFilterId = (): string => `filter-${Date.now()}-${rand()}`;
+
 // Stable string key for a ResolvedFocus, used to detect focus changes turn-over-turn.
 // Empty string means "no focus." Two ResolvedFocuses with the same key are considered
 // the same focus for thread-rotation purposes.

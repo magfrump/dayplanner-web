@@ -3,6 +3,7 @@ export interface Value {
     name: string;
     description?: string;
     color?: string;
+    tags?: string[];
 }
 
 export interface Goal {
@@ -12,6 +13,7 @@ export interface Goal {
     valueId: number;
     timeframe: string;
     completed: boolean;
+    tags?: string[];
 }
 
 export interface Project {
@@ -22,6 +24,7 @@ export interface Project {
     documents?: string[]; // List of absolute file paths
     status: 'not_started' | 'in_progress' | 'completed';
     completed: boolean;
+    tags?: string[];
 }
 
 export interface Task {
@@ -36,6 +39,13 @@ export interface Task {
     deadline?: string;
     recurrence?: string;
     attachments?: string[];
+    tags?: string[];
+}
+
+export interface SavedFilter {
+    id: string; // uuid-ish
+    name: string;
+    tags: string[]; // AND semantics — item matches when it has all tags
 }
 
 export interface Capacity {
