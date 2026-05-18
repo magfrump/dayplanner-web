@@ -22,6 +22,8 @@ export interface Project {
     description?: string;
     goalId: number;
     documents?: string[]; // List of absolute file paths
+    // Folders to re-scan periodically; new files merge into documents[].
+    watchedFolders?: string[];
     status: 'not_started' | 'in_progress' | 'completed';
     completed: boolean;
     tags?: string[];

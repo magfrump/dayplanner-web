@@ -1,8 +1,9 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Value, Goal, Project, Task, Capacity, SavedFilter } from '../types/planner';
 import { initializeStorage } from '../utils/storagePolyfill';
 import { nextId } from '../utils/ids';
+import { listFolder, mergeDocuments } from '../services/folderImport';
 
 initializeStorage();
 
@@ -175,6 +176,44 @@ export const usePlannerData = () => {
             updateItem('task', { ...task, completed: !task.completed });
         }
     };
+
+    // Re-scan each project's watchedFolders once on initial load. New files are
+    // merged into documents[]; existing files keep their position. Failures
+    // (folder gone, server unreachable) are logged but don't block the app.
+    const watchRescanRanRef = useRef(false);
+    useEffect(() => {
+        if (!isDataLoaded || watchRescanRanRef.current) return;
+        watchRescanRanRef.current = true;
+
+        const projectsWithWatchers = projects.filter(p => Array.isArray(p.watchedFolders) && p.watchedFolders.length > 0);
+        if (projectsWithWatchers.length === 0) return;
+
+        (async () => {
+            for (const project of projectsWithWatchers) {
+                const folders = project.watchedFolders ?? [];
+                let nextDocs = project.documents ?? [];
+                let changed = false;
+                for (const folder of folders) {
+                    try {
+                        const { files } = await listFolder(folder);
+                        const merged = mergeDocuments(nextDocs, files);
+                        if (merged.length !== nextDocs.length) {
+                            nextDocs = merged;
+                            changed = true;
+                        }
+                    } catch (err) {
+                        console.warn(`Watched folder rescan failed for project ${project.id} (${folder}):`, err);
+                    }
+                }
+                if (changed) {
+                    updateItem('project', { id: project.id, documents: nextDocs });
+                }
+            }
+        })();
+        // updateItem and projects are intentionally captured at first-load time;
+        // ref-guarding prevents re-runs when projects update due to our own writes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isDataLoaded]);
 
     return {
         values, setValues,

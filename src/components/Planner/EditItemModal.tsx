@@ -5,6 +5,7 @@ import { WORK_TYPES } from '../../types/planner';
 import type { Value, Goal, Project } from '../../types/planner';
 import type { EditModeState, EditItemData } from '../../types/ui';
 import { TagInput } from './TagInput';
+import { FolderAttach } from './FolderAttach';
 
 interface EditItemModalProps {
     editMode: EditModeState;
@@ -156,6 +157,12 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                                 </button>
                             </div>
                         </div>
+
+                        <FolderAttach
+                            documents={data.documents}
+                            watchedFolders={data.watchedFolders}
+                            onChange={(next) => updateData(next)}
+                        />
                     </>
                 )}
 

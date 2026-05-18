@@ -277,6 +277,42 @@ const isReadFileAllowed = async (resolvedPath) => {
     return false;
 };
 
+// List non-hidden, non-directory entries in a folder. Accepts any absolute path
+// the local user supplies — same trust model as /api/read-file once a file is
+// in a project's documents[]. Capped at 500 entries to prevent runaway folders.
+app.get('/api/list-folder', async (req, res) => {
+    const folderPath = req.query.path;
+    if (!folderPath || typeof folderPath !== 'string') {
+        return res.status(400).json({ error: 'Missing path parameter' });
+    }
+    if (!path.isAbsolute(folderPath)) {
+        return res.status(400).json({ error: 'Path must be absolute' });
+    }
+
+    try {
+        const absolutePath = path.resolve(folderPath);
+        const stats = await fs.stat(absolutePath);
+        if (!stats.isDirectory()) {
+            return res.status(400).json({ error: 'Not a directory' });
+        }
+
+        const entries = await fs.readdir(absolutePath, { withFileTypes: true });
+        const files = entries
+            .filter(e => e.isFile() && !e.name.startsWith('.'))
+            .map(e => path.join(absolutePath, e.name))
+            .sort();
+
+        const capped = files.slice(0, 500);
+        res.json({ files: capped, truncated: files.length > 500 });
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            return res.status(404).json({ error: 'Folder not found' });
+        }
+        console.error(`Error listing folder ${folderPath}:`, error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.get('/api/read-file', async (req, res) => {
     const filePath = req.query.path;
     if (!filePath || typeof filePath !== 'string') {
