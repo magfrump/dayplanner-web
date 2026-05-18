@@ -37,13 +37,13 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({ goals, values, onAdd
                         const value = values.find(v => v.id === goal.valueId);
                         return (
                             <div key={goal.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded">
-                                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: value?.color }} />
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <span>{goal.name}</span>
+                                <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: value?.color }} />
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="break-words">{goal.name}</span>
                                         <TagChips tags={goal.tags} activeTags={activeTags} onTagClick={onTagClick} />
                                     </div>
-                                    <div className="text-xs text-gray-500">{value?.name}</div>
+                                    <div className="text-xs text-gray-500 truncate">{value?.name}</div>
                                 </div>
                                 <button onClick={() => onEdit(goal)} className="text-gray-500 hover:text-gray-700">
                                     <Edit2 size={16} />

@@ -34,9 +34,9 @@ export const ValuesSection: React.FC<ValuesSectionProps> = ({ values, onAdd, onE
                 <div className="space-y-2">
                     {values.map(value => (
                         <div key={value.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded">
-                            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: value.color }} />
-                            <div className="flex-1 flex items-center gap-2">
-                                <span>{value.name}</span>
+                            <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: value.color }} />
+                            <div className="flex-1 min-w-0 flex flex-wrap items-center gap-2">
+                                <span className="break-words">{value.name}</span>
                                 <TagChips tags={value.tags} activeTags={activeTags} onTagClick={onTagClick} />
                             </div>
                             <button onClick={() => onEdit(value)} className="text-gray-500 hover:text-gray-700">

@@ -45,13 +45,14 @@ export const TasksSection: React.FC<TasksSectionProps> = ({
                         <div key={task.id} className={`flex items-center gap-3 p-2 hover:bg-gray-50 rounded ${task.completed ? 'opacity-50' : ''}`}>
                             <input
                                 type="checkbox"
+                                className="shrink-0"
                                 checked={task.completed}
                                 onChange={() => onToggle(task.id)}
                             />
-                            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: value?.color }} />
-                            <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                    <span className={task.completed ? 'line-through' : ''}>{task.name}</span>
+                            <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: value?.color }} />
+                            <div className="flex-1 min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className={`break-words ${task.completed ? 'line-through' : ''}`}>{task.name}</span>
                                     <TagChips tags={task.tags} activeTags={activeTags} onTagClick={onTagClick} />
                                 </div>
                                 <div className="text-xs text-gray-500 flex flex-wrap gap-2 items-center mt-0.5">

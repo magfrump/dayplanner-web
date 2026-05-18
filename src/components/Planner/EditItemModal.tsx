@@ -113,7 +113,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                             <div className="space-y-2 mb-2">
                                 {(data.documents || []).map((doc: string, idx: number) => (
                                     <div key={idx} className="flex gap-2 items-center text-sm bg-gray-50 p-2 rounded">
-                                        <span className="flex-1 truncate font-mono">{doc}</span>
+                                        <span className="flex-1 min-w-0 truncate font-mono">{doc}</span>
                                         <button
                                             onClick={() => {
                                                 const docs = [...(data.documents || [])];
@@ -181,7 +181,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                             </select>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                                 <label className="block text-sm font-medium mb-1">Importance (1-5)</label>
                                 <input
@@ -216,7 +216,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                             </select>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                                 <label className="block text-sm font-medium mb-1">Deadline</label>
                                 <input

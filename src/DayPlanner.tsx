@@ -312,7 +312,7 @@ const DayPlanner = () => {
                 traceData={viewingTrace}
             />
 
-            <div className="flex gap-1.5 mb-4">
+            <div className="flex flex-wrap gap-1.5 mb-4">
                 <button onClick={() => setActiveTab('plan')}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'plan' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-gray-600 hover:bg-gray-100'}`}>
                     Plan
