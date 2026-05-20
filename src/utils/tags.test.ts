@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { collectAllTags, matchesAllTags } from './tags';
+import { collectAllTags, matchesAllTags, normalizeTag } from './tags';
 import type { Value, Goal, Project, Task } from '../types/planner';
 
 const v = (id: number, tags?: string[]): Value => ({ id, name: `v${id}`, tags });
@@ -7,6 +7,24 @@ const g = (id: number, tags?: string[]): Goal => ({ id, name: `g${id}`, valueId:
 const p = (id: number, tags?: string[]): Project => ({ id, name: `p${id}`, goalId: 1, status: 'in_progress', completed: false, tags });
 const t = (id: number, tags?: string[]): Task => ({
     id, name: `t${id}`, projectId: 1, importance: 3, urgency: 3, workType: 'focus', completed: false, tags,
+});
+
+describe('normalizeTag', () => {
+    it('lowercases', () => {
+        expect(normalizeTag('Health')).toBe('health');
+    });
+
+    it('collapses internal whitespace to single hyphens', () => {
+        expect(normalizeTag('high   priority')).toBe('high-priority');
+    });
+
+    it('trims surrounding whitespace', () => {
+        expect(normalizeTag('  errand ')).toBe('errand');
+    });
+
+    it('is idempotent', () => {
+        expect(normalizeTag(normalizeTag('Deep Work'))).toBe('deep-work');
+    });
 });
 
 describe('collectAllTags', () => {

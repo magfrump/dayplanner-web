@@ -31,6 +31,7 @@ const Harness: React.FC<{
                 toggleTask: () => { },
                 setCapacity: () => { },
                 setSavedFilters: setFilters as React.Dispatch<React.SetStateAction<SavedFilter[]>>,
+                updateItem: () => { },
             }}
             ui={{
                 editMode,

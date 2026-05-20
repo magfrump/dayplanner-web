@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { X } from 'lucide-react';
+import { normalizeTag as normalize } from '../../utils/tags';
 
 interface TagInputProps {
     tags: string[];
@@ -7,8 +8,6 @@ interface TagInputProps {
     suggestions?: string[];
     placeholder?: string;
 }
-
-const normalize = (raw: string): string => raw.trim().toLowerCase().replace(/\s+/g, '-');
 
 export const TagInput: React.FC<TagInputProps> = ({ tags, onChange, suggestions = [], placeholder }) => {
     const [draft, setDraft] = useState('');

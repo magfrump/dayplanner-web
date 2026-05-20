@@ -4,6 +4,12 @@ export interface Tagged {
     tags?: string[];
 }
 
+// Canonical tag form: trimmed, lowercased, internal whitespace collapsed to
+// hyphens. Shared by every surface that creates tags (TagInput, TagManagerModal)
+// so normalization can't diverge between them.
+export const normalizeTag = (raw: string): string =>
+    raw.trim().toLowerCase().replace(/\s+/g, '-');
+
 export const collectAllTags = (
     values: Value[],
     goals: Goal[],

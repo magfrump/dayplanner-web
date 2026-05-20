@@ -6,6 +6,8 @@ import { TasksSection } from './TasksSection';
 import { CapacitySection } from './CapacitySection';
 import { EditItemModal } from './EditItemModal';
 import { TagFilterBar } from './TagFilterBar';
+import { TagManagerModal } from './TagManagerModal';
+import { Tags } from 'lucide-react';
 import { collectAllTags, matchesAllTags } from '../../utils/tags';
 import type { Value, Goal, Project, Task, Capacity, SavedFilter } from '../../types/planner';
 
@@ -25,6 +27,7 @@ interface DataViewProps {
         toggleTask: (id: number) => void;
         setCapacity: React.Dispatch<React.SetStateAction<Capacity>>;
         setSavedFilters: React.Dispatch<React.SetStateAction<SavedFilter[]>>;
+        updateItem: (type: 'value' | 'goal' | 'project' | 'task', item: { id: number } & Partial<Value | Goal | Project | Task>) => void;
     };
     ui: {
         editMode: EditModeState;
@@ -42,10 +45,13 @@ export const PlannerDataView: React.FC<DataViewProps> = ({ data, actions, ui }) 
     );
 
     const [activeTags, setActiveTags] = useState<string[]>([]);
+    const [tagManagerOpen, setTagManagerOpen] = useState(false);
 
     const toggleActiveTag = (tag: string) => {
         setActiveTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
     };
+
+    const hasAnyItem = data.values.length + data.goals.length + data.projects.length + data.tasks.length > 0;
 
     const filtered = useMemo(() => {
         if (activeTags.length === 0) {
@@ -70,6 +76,29 @@ export const PlannerDataView: React.FC<DataViewProps> = ({ data, actions, ui }) 
             />
 
             <CapacitySection capacity={data.capacity} onUpdate={actions.setCapacity} />
+
+            {hasAnyItem && (
+                <div className="flex justify-end">
+                    <button
+                        type="button"
+                        onClick={() => setTagManagerOpen(true)}
+                        className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-blue-700 border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white"
+                    >
+                        <Tags size={14} /> Manage tags
+                    </button>
+                </div>
+            )}
+
+            <TagManagerModal
+                open={tagManagerOpen}
+                onClose={() => setTagManagerOpen(false)}
+                values={data.values}
+                goals={data.goals}
+                projects={data.projects}
+                tasks={data.tasks}
+                allTags={allTags}
+                onSetItemTags={(type, id, tags) => actions.updateItem(type, { id, tags })}
+            />
 
             <TagFilterBar
                 allTags={allTags}

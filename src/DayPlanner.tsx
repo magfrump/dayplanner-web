@@ -335,7 +335,7 @@ const DayPlanner = () => {
             {activeTab === 'data' && (
                 <PlannerDataView
                     data={{ values, goals, projects, tasks, capacity, savedFilters }}
-                    actions={{ deleteItem, toggleTask, setCapacity, setSavedFilters }}
+                    actions={{ deleteItem, toggleTask, setCapacity, setSavedFilters, updateItem }}
                     ui={{
                         editMode,
                         setEditMode,
