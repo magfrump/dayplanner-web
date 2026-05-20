@@ -14,6 +14,7 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0', // Force bind to all network interfaces
+    allowedHosts: ['cusbert', 'cusbert.tail61df34.ts.net'],
     port: 5173,
     strictPort: true,
     proxy: {
@@ -39,6 +40,10 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/api/read-file': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+      },
+      '/api/list-folder': {
         target: 'http://localhost:3002',
         changeOrigin: true,
       },
