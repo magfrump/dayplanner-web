@@ -83,14 +83,14 @@ export const TagManagerModal: React.FC<TagManagerModalProps> = ({
                 className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="flex justify-between items-center p-4 border-b">
+                <div className="flex justify-between items-center p-4 border-b shrink-0">
                     <h3 className="font-semibold">Manage tags</h3>
                     <button onClick={onClose} aria-label="Close" className="text-gray-500 hover:text-gray-700">
                         <X size={20} />
                     </button>
                 </div>
 
-                <div className="p-4 border-b space-y-2">
+                <div className="p-4 border-b space-y-2 shrink-0">
                     <div className="flex items-center gap-2">
                         <label htmlFor="tag-select" className="text-sm font-medium text-gray-600">Tag:</label>
                         <select
@@ -124,7 +124,7 @@ export const TagManagerModal: React.FC<TagManagerModalProps> = ({
                     </div>
                 </div>
 
-                <div className="p-4 overflow-y-auto flex-1 space-y-4">
+                <div className="p-4 overflow-y-auto flex-1 min-h-0 space-y-4">
                     {!effectiveTag && (
                         <p className="text-sm text-gray-500">Pick or create a tag to assign it to items.</p>
                     )}
@@ -157,7 +157,7 @@ export const TagManagerModal: React.FC<TagManagerModalProps> = ({
                     ))}
                 </div>
 
-                <div className="flex justify-between items-center p-4 border-t">
+                <div className="flex justify-between items-center p-4 border-t shrink-0">
                     <span className="text-xs text-gray-500">
                         {effectiveTag ? `${memberCount} ${memberCount === 1 ? 'item' : 'items'} tagged` : ''}
                     </span>
