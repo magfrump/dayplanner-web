@@ -28,6 +28,20 @@ const logsDir = path.resolve('logs');
 const getFileForKey = (key) => path.join(DATA_DIR, `${key}.json`);
 const getLastGoodFileForKey = (key) => path.join(DATA_DIR, `${key}.last-good.json`);
 
+// Translate a Windows-style absolute path to its WSL mount so folders pasted
+// from Windows Explorer resolve against the WSL filesystem this server runs on.
+//   C:\Users\me\Docs -> /mnt/c/Users/me/Docs ;  D:/data -> /mnt/d/data
+// No-op on native Windows (path.sep === '\\'), for POSIX paths, and for UNC
+// paths (\\server\share — left for the OS, currently unsupported).
+const toWslPath = (inputPath) => {
+    if (typeof inputPath !== 'string' || path.sep === '\\') return inputPath;
+    const driveMatch = /^([A-Za-z]):[\\/](.*)$/.exec(inputPath);
+    if (!driveMatch) return inputPath;
+    const drive = driveMatch[1].toLowerCase();
+    const rest = driveMatch[2].replace(/\\/g, '/');
+    return `/mnt/${drive}/${rest}`;
+};
+
 // Multer setup for file uploads
 import multer from 'multer';
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
@@ -281,10 +295,11 @@ const isReadFileAllowed = async (resolvedPath) => {
 // the local user supplies — same trust model as /api/read-file once a file is
 // in a project's documents[]. Capped at 500 entries to prevent runaway folders.
 app.get('/api/list-folder', async (req, res) => {
-    const folderPath = req.query.path;
-    if (!folderPath || typeof folderPath !== 'string') {
+    const rawPath = req.query.path;
+    if (!rawPath || typeof rawPath !== 'string') {
         return res.status(400).json({ error: 'Missing path parameter' });
     }
+    const folderPath = toWslPath(rawPath);
     if (!path.isAbsolute(folderPath)) {
         return res.status(400).json({ error: 'Path must be absolute' });
     }
@@ -314,10 +329,11 @@ app.get('/api/list-folder', async (req, res) => {
 });
 
 app.get('/api/read-file', async (req, res) => {
-    const filePath = req.query.path;
-    if (!filePath || typeof filePath !== 'string') {
+    const rawPath = req.query.path;
+    if (!rawPath || typeof rawPath !== 'string') {
         return res.status(400).send('Missing path parameter');
     }
+    const filePath = toWslPath(rawPath);
 
     try {
         const absolutePath = path.resolve(filePath);
@@ -551,7 +567,7 @@ app.patch('/api/storage/:key', async (req, res) => {
     }
 });
 
-export { app, initData };
+export { app, initData, toWslPath };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
     initData().then(() => {
