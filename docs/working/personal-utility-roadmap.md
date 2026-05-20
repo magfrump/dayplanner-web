@@ -185,18 +185,28 @@ Plan is ready to commit. Phase 1 can start whenever you want to kick it off.
 
 | Sub-task | Status | Notes |
 |---|---|---|
-| #21a Tailscale + responsive polish | **Done (uncommitted)** — narrow-width fixes applied; Tailscale install remains a user-side action | Section rows (Values/Goals/Projects/Tasks) now use `min-w-0`/`shrink-0` so long names and tag chips don't push edit/delete buttons off-screen. `EditItemModal` paired grids collapse to a single column below `sm:` (importance/urgency, deadline/recurrence). Documents list entry uses `min-w-0` so `truncate` actually engages. `FolderAttach` row wraps (input takes full line on narrow, buttons sit together). Tab row (Plan/Data/Map/History) has `flex-wrap` instead of horizontal clipping. Full suite (122) still passes. |
+| #21a Tailscale + responsive polish | **Done** — phone has successfully reached the app via Tailscale; narrow-width fixes applied (commit `05406db`) | Tailscale install confirmed working from phone (2026-05-18). Setup steps captured in [`tailscale-setup.md`](./tailscale-setup.md) for repeatability. Section rows (Values/Goals/Projects/Tasks) now use `min-w-0`/`shrink-0` so long names and tag chips don't push edit/delete buttons off-screen. `EditItemModal` paired grids collapse to a single column below `sm:` (importance/urgency, deadline/recurrence). Documents list entry uses `min-w-0` so `truncate` actually engages. `FolderAttach` row wraps (input takes full line on narrow, buttons sit together). Tab row (Plan/Data/Map/History) has `flex-wrap` instead of horizontal clipping. Full suite (122) still passes. |
 | #7 Tags + saved filters | **Done (uncommitted)** — code + tests on disk, lint and full test suite pass | Data model: `tags?: string[]` on V/G/P/T plus `SavedFilter`. UI: `TagInput` in `EditItemModal`, `TagChips` rows in every section, `TagFilterBar` above the data sections with AND-semantics filter + named saved filters persisted to `planner-saved-filters`. Tests: `src/utils/tags.test.ts`, `src/components/Planner/TagFilterBar.test.tsx`. |
 | #9 Slim folder-pick-and-attach | **Done (uncommitted)** — code + tests on disk, lint and full test suite (122) pass | Backend: `GET /api/list-folder?path=<absolute>` in `storage-server.js` (non-recursive, dotfile-filtered, capped at 500). Type: `watchedFolders?: string[]` on Project. UI: `FolderAttach` in the project branch of `EditItemModal` (folder path + Attach + Watch toggle). Hook: one-shot rescan in `usePlannerData` that merges new files into `documents[]` on initial load. Tests: `list-folder.test.js`, `src/services/folderImport.test.ts`, `src/components/Planner/FolderAttach.test.tsx`. |
 
-**Phase 1 status: complete on the code side, uncommitted.** The Tailscale install step is the only remaining bit and is a user-side action (install + auth on phone and laptop). Phase 1 is ready for the live-with period the plan calls for (≥1 week before Phase 2 starts).
+**Phase 1 status: shipped.** Tags + filters, folder import, and narrow-width layout fixes are committed (`9a3a5bb`, `c5c8d41`, `05406db`). Tailscale install verified working from phone on 2026-05-18. Phase 1 is now in the live-with period the plan calls for (≥1 week before Phase 2 starts).
 
 Hypothesis check at end of phase-1 live-with (per the plan's falsifiable rows):
 - Did I reach for the phone version unprompted ≥5 times? (#21a)
 - Did I create and reuse ≥3 saved filters? (#7)
 - Did a real folder import land useful content? (#9)
 
-Next iteration starting points (no urgent work; all Phase 1 code is shipped):
-1. **Review + commit** the uncommitted Phase 1 work (single squash commit or three feature commits — recommended split: `feat: phase 1.1 tags + saved filters`, `feat: phase 1.2 folder import + rescan`, `chore: phase 1.3 narrow-width layout fixes`).
-2. **Phase 2 prep** — confirm phase 1's hypotheses are tracking, then begin the data-model addition for #13 nudges (recurrence primitive on Task — already exists as a free-text `recurrence?: string` field; needs structured shape for time-of-day scheduling).
+### Interim check-in — 2026-05-19 (day 1–2 of live-with)
+
+Partial answers, recorded because the signal is already directional:
+
+- **#21a (phone) — strongly confirmed.** Reached for the phone version unprompted multiple times on the first day (target was ≥5 over two weeks). No revisit trigger fired.
+- **#7 (tags + filters) — value yes, UX no.** Created filters, but the authoring/maintenance UX is bad enough that the user knows they won't keep them up without changes. This is a **UX failure, not a value failure**, and it **confounds the phase 2→3 gate**: the gate is meant to measure whether tags+filters *cover retrieval*, but if the maintenance UX is too poor to sustain, the gate would observe "stopped using filters" and misread it as "tags+filters don't cover retrieval." So #7 needs a small UX iteration **before** the gate can be a fair test — leading candidates: bulk tag-assignment (e.g. checkbox-select items when creating/applying a tag) and a freshness/staleness affordance so manual tags don't silently rot.
+- **#9 (folder import) — works, payoff gated on B3.** Imported a folder, but imported project info "won't be very interesting until the planner → workflow transitions are better." That payoff is exactly what **#22 (per-project context brief, Phase 2)** delivers — so #9's value is gated on Phase 2 work, not on anything in Phase 1.
+
+**Meta (user's call, confirmed against the plan):** these answers aren't complete, and **Phase 2 does not depend on completing them.** Only the phase 2→3 *gate* consumes #7 evidence, and that's evaluated at the end of Phase 2. Phase 2 (#13 nudges, #22 context brief) can start now. The #7 UX iteration above should land before the gate fires so the gate measures the concept, not the friction.
+
+Next iteration starting points (Phase 1 in live-with; Phase 2 unblocked):
+1. **#7 UX iteration (new — not in the original phase plan)** — bulk tag-assignment + a freshness/staleness affordance, so #7 is a fair baseline for the phase 2→3 gate. Small, isolated UI consistent with #7's original "isolated UI" characterization. Sequence before the gate, not necessarily before Phase 2.
+2. **Phase 2 prep** — begin the #13 recurrence primitive on Task (currently a free-text `recurrence?: string`; needs a structured shape for time-of-day scheduling) and the #22 context-brief data model (last-focus timestamp per project).
 
